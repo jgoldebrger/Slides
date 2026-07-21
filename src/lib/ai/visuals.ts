@@ -250,26 +250,15 @@ export async function buildVisualPromptFromAnnotatedUpload({
   return text.trim().slice(0, 900);
 }
 
-export async function generateSlideImage(prompt: string): Promise<Buffer> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+function extensionForMime(mimeType: string) {
+  if (mimeType.includes("jpeg")) return "jpg";
+  if (mimeType.includes("webp")) return "webp";
+  return "png";
+}
 
-  const response = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "gpt-image-1",
-      prompt,
-      size: "1536x1024",
-      n: 1,
-    }),
-  });
-
+async function parseOpenAiImageResponse(response: Response): Promise<Buffer> {
   if (!response.ok) {
-    let message = `Image generation failed (${response.status})`;
+    let message = `Image API failed (${response.status})`;
     try {
       const err = (await response.json()) as {
         error?: { message?: string };
@@ -294,4 +283,63 @@ export async function generateSlideImage(prompt: string): Promise<Buffer> {
     return Buffer.from(await imageRes.arrayBuffer());
   }
   throw new Error("No image returned from OpenAI");
+}
+
+/** Edit an existing slide image in place (follows user instructions). */
+export async function editSlideImage({
+  imageBytes,
+  mimeType,
+  prompt,
+  inputFidelity = "high",
+}: {
+  imageBytes: Uint8Array;
+  mimeType: string;
+  prompt: string;
+  inputFidelity?: "high" | "low";
+}): Promise<Buffer> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+
+  const ext = extensionForMime(mimeType);
+  const form = new FormData();
+  const bytes = Buffer.from(imageBytes);
+  form.append(
+    "image",
+    new Blob([bytes], { type: mimeType }),
+    `source.${ext}`
+  );
+  form.append("model", "gpt-image-1");
+  form.append("prompt", prompt.slice(0, 4000));
+  form.append("size", "1536x1024");
+  form.append("input_fidelity", inputFidelity);
+  form.append("quality", "medium");
+
+  const response = await fetch("https://api.openai.com/v1/images/edits", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+
+  return parseOpenAiImageResponse(response);
+}
+
+export async function generateSlideImage(prompt: string): Promise<Buffer> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY is not configured");
+
+  const response = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-image-1",
+      prompt,
+      size: "1536x1024",
+      n: 1,
+    }),
+  });
+
+  return parseOpenAiImageResponse(response);
 }

@@ -1,12 +1,14 @@
 import { createHash } from "crypto";
 import {
-  buildVisualPromptFromAnnotatedUpload,
   buildVisualPromptFromSlide,
-  buildVisualPromptFromUpload,
+  editSlideImage,
   generateSlideImage,
   type VisualStyle,
 } from "@/lib/ai/visuals";
-import { buildAnnotatePolishDirectPrompt } from "@/lib/ai/prompts/visuals";
+import {
+  buildAnnotatePolishEditPrompt,
+  buildRefineEditPrompt,
+} from "@/lib/ai/prompts/visuals";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSignedStorageUrl } from "@/lib/storage/images";
 
@@ -98,7 +100,7 @@ export async function runSlideVisualJob({
     const brandColors = await loadBrandColors(supabase, deck.org_id);
     const outputPath = `${deck.org_id}/${deckId}/${slideId}/visual-${crypto.randomUUID()}.png`;
 
-    let dallePrompt: string;
+    let generated: Buffer;
     if (mode === "refine" || mode === "annotate_polish") {
       if (!sourcePath) throw new Error("Source image required for refine");
       const { data: fileData, error: downloadError } = await supabase.storage
@@ -108,42 +110,37 @@ export async function runSlideVisualJob({
         throw new Error(downloadError?.message ?? "Failed to load source image");
       }
       const buffer = Buffer.from(await fileData.arrayBuffer());
+      const mime = sourceMimeType ?? "image/png";
+
       if (mode === "annotate_polish") {
-        try {
-          dallePrompt = await Promise.race([
-            buildVisualPromptFromAnnotatedUpload({
-              imageBytes: new Uint8Array(buffer),
-              mimeType: sourceMimeType ?? "image/png",
-              slideTitle: slide.title,
-              slideContext,
-              userInstructions: instructions,
-              keepAnnotations: keepAnnotations ?? false,
-              brandColors,
-            }),
-            new Promise<string>((_, reject) => {
-              setTimeout(() => reject(new Error("Vision prompt timed out")), 45_000);
-            }),
-          ]);
-        } catch {
-          dallePrompt = buildAnnotatePolishDirectPrompt({
-            slideTitle: slide.title,
-            slideContext,
-            userInstructions: instructions,
-            keepAnnotations: keepAnnotations ?? false,
-            brandColors,
-          });
-        }
-      } else {
-        dallePrompt = await buildVisualPromptFromUpload({
+        const editPrompt = buildAnnotatePolishEditPrompt({
+          slideTitle: slide.title,
+          slideContext,
+          userInstructions: instructions,
+          keepAnnotations: keepAnnotations ?? false,
+          brandColors,
+        });
+        generated = await editSlideImage({
           imageBytes: new Uint8Array(buffer),
-          mimeType: sourceMimeType ?? "image/png",
+          mimeType: mime,
+          prompt: editPrompt,
+          inputFidelity: "high",
+        });
+      } else {
+        const editPrompt = buildRefineEditPrompt({
           slideTitle: slide.title,
           slideContext,
           userInstructions: instructions,
         });
+        generated = await editSlideImage({
+          imageBytes: new Uint8Array(buffer),
+          mimeType: mime,
+          prompt: editPrompt,
+          inputFidelity: "high",
+        });
       }
     } else {
-      dallePrompt = await buildVisualPromptFromSlide({
+      const dallePrompt = await buildVisualPromptFromSlide({
         slideTitle: slide.title,
         slideContext,
         slideLayout: slide.layout,
@@ -151,9 +148,8 @@ export async function runSlideVisualJob({
         visualStyle: visualStyle ?? "illustration",
         brandColors,
       });
+      generated = await generateSlideImage(dallePrompt);
     }
-
-    const generated = await generateSlideImage(dallePrompt);
 
     const { error: visualUploadError } = await supabase.storage
       .from("slide-assets")

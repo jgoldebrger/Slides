@@ -191,3 +191,57 @@ export function buildAnnotatePolishDirectPrompt({
 
   return prompt.slice(0, 900);
 }
+
+/** Prompt for in-place image edit (annotate polish). */
+export function buildAnnotatePolishEditPrompt({
+  slideTitle,
+  slideContext,
+  userInstructions,
+  keepAnnotations,
+}: {
+  slideTitle: string;
+  slideContext: string;
+  userInstructions?: string;
+  keepAnnotations: boolean;
+  brandColors?: { primary: string; accent: string };
+}) {
+  const markup = keepAnnotations
+    ? "Keep user annotation marks (highlights, arrows, boxes, labels) visible in the result."
+    : "Remove editor markup (pen strokes, highlighter, arrows, boxes). Apply what those marks indicated.";
+
+  return [
+    "Edit this image in place. Do NOT replace it with an abstract gradient, decorative slide background, or unrelated stock illustration.",
+    `USER REQUEST (highest priority — follow exactly): ${userInstructions || "Polish for a clean executive presentation."}`,
+    markup,
+    "Preserve the same scene, people, objects, and overall composition unless the user request says to remove or change them.",
+    `Slide title: ${slideTitle}.`,
+    slideContext ? `Context: ${slideContext}.` : "",
+    "No watermarks. Do not invent metrics, dates, or text not in the source.",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 4000);
+}
+
+/** Prompt for in-place image edit (refine upload). */
+export function buildRefineEditPrompt({
+  slideTitle,
+  slideContext,
+  userInstructions,
+}: {
+  slideTitle: string;
+  slideContext: string;
+  userInstructions?: string;
+}) {
+  return [
+    "Edit this presentation visual in place. Do NOT generate an abstract background or unrelated illustration.",
+    `USER REQUEST: ${userInstructions || "Polish labels, contrast, and layout for an executive deck."}`,
+    "Preserve all factual content, labels, and data visible in the source.",
+    `Slide: ${slideTitle}.`,
+    slideContext ? `Context: ${slideContext}.` : "",
+    "No watermarks.",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .slice(0, 4000);
+}
