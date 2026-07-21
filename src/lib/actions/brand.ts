@@ -24,6 +24,7 @@ export async function saveBrandKit(payload: unknown) {
       primary_color: parsed.data.primary_color,
       accent_color: parsed.data.accent_color,
       font_style: parsed.data.font_style,
+      ai_tone: parsed.data.ai_tone,
       updated_at: new Date().toISOString(),
     },
     { onConflict: "org_id" }

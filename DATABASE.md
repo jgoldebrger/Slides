@@ -18,7 +18,7 @@ Supabase Postgres with Row Level Security on all public tables.
 | `decks` | Presentation decks |
 | `slides` | Individual slides |
 | `slide_assets` | Images attached to slides |
-| `brand_kits` | Org branding (one per org) |
+| `brand_kits` | Org branding (colors, logo, font, AI writing tone) |
 | `exports` | PPTX export jobs |
 | `ai_generations` | AI usage audit log (`status`, optional `result` jsonb for async job polling) |
 | `deck_share_links` | View-only share tokens (hashed) for stakeholder access |

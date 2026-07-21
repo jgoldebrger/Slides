@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { BrandKitForm } from "@/components/brand/brand-kit-form";
 import { getBrandKit } from "@/lib/actions/brand";
+import { normalizeAiTone } from "@/lib/ai/tone";
 import { getSignedStorageUrl } from "@/lib/storage/images";
 import { redirectIfViewer } from "@/lib/viewer-guard";
 import { createClient } from "@/lib/supabase/server";
@@ -13,6 +14,7 @@ const defaults: BrandKitInput = {
   primary_color: "#171717",
   accent_color: "#2563eb",
   font_style: "sans",
+  ai_tone: "executive",
 };
 
 export default async function BrandKitPage() {
@@ -27,7 +29,9 @@ export default async function BrandKitPage() {
     name: brand?.name ?? defaults.name,
     primary_color: brand?.primary_color ?? defaults.primary_color,
     accent_color: brand?.accent_color ?? defaults.accent_color,
-    font_style: (brand?.font_style ?? defaults.font_style) as BrandKitInput["font_style"],
+    font_style: (brand?.font_style ??
+      defaults.font_style) as BrandKitInput["font_style"],
+    ai_tone: normalizeAiTone(brand?.ai_tone ?? defaults.ai_tone),
     logo_path: brand?.logo_path,
     logo_url: logoUrl,
   };
@@ -37,7 +41,7 @@ export default async function BrandKitPage() {
       <div>
         <h1 className="text-xl font-semibold">Brand kit</h1>
         <p className="text-muted-foreground">
-          Customize colors, fonts, and logo for slide preview and export.
+          Customize colors, fonts, logo, and AI writing tone for this workspace.
         </p>
       </div>
       <BrandKitForm initialData={initialData} />

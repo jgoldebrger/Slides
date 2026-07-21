@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { DECK_TYPES, SLIDE_LAYOUTS } from "@/types/slide";
+import { AI_TONES } from "@/lib/ai/tone";
 
 export const projectSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
@@ -79,6 +80,7 @@ export const brandKitSchema = z.object({
   primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   accent_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
   font_style: z.enum(["sans", "serif", "mono"]).default("sans"),
+  ai_tone: z.enum(AI_TONES).default("executive"),
 });
 
 export type ProjectInput = z.infer<typeof projectSchema>;

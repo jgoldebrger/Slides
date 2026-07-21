@@ -1,5 +1,6 @@
 import type { DeckOutline, DeckType } from "@/types/slide";
 import { DECK_TYPE_LABELS } from "@/lib/deck-labels";
+import { aiTonePromptHint, type AiTone } from "@/lib/ai/tone";
 
 export function buildOutlinePrompt({
   deckType,
@@ -8,6 +9,7 @@ export function buildOutlinePrompt({
   updates,
   existingOutline,
   existingSlideCount,
+  aiTone = "executive",
 }: {
   deckType: DeckType;
   projectName: string;
@@ -15,6 +17,7 @@ export function buildOutlinePrompt({
   updates: Record<string, unknown>;
   existingOutline?: DeckOutline | null;
   existingSlideCount?: number;
+  aiTone?: AiTone;
 }) {
   const preserveStructure =
     existingOutline?.slides?.length &&
@@ -39,6 +42,9 @@ ${JSON.stringify(existingOutline, null, 2)}
   return `You are an expert presentation designer for project update decks.
 
 Create a slide outline for a "${DECK_TYPE_LABELS[deckType]}" deck.
+
+Voice / tone:
+- ${aiTonePromptHint(aiTone)}
 
 Rules:
 - Use ONLY facts from the project data below. Do not invent metrics, dates, or achievements.

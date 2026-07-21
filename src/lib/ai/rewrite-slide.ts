@@ -1,6 +1,7 @@
 import { createHash } from "crypto";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { loadOrgAiTone } from "@/lib/ai/load-org-tone";
 import { buildRewriteSlidePrompt } from "@/lib/ai/prompts/rewrite";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -28,6 +29,14 @@ export async function runRewriteSlide({
       throw new Error("OPENAI_API_KEY is not configured");
     }
 
+    const { data: deck, error: deckError } = await supabase
+      .from("decks")
+      .select("org_id")
+      .eq("id", deckId)
+      .single();
+
+    if (deckError || !deck) throw new Error("Deck not found");
+
     const { data: slide, error: slideError } = await supabase
       .from("slides")
       .select("*")
@@ -37,6 +46,7 @@ export async function runRewriteSlide({
 
     if (slideError || !slide) throw new Error("Slide not found");
 
+    const aiTone = await loadOrgAiTone(supabase, deck.org_id);
     const layout = slide.layout as SlideLayout;
     const { object } = await generateObject({
       model: openai("gpt-4o-mini"),
@@ -45,6 +55,7 @@ export async function runRewriteSlide({
         layout,
         title: slide.title,
         content: slide.content,
+        aiTone,
       }),
     });
 

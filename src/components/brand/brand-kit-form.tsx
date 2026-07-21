@@ -6,6 +6,12 @@ import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
 import { saveBrandKit, uploadBrandLogo } from "@/lib/actions/brand";
 import {
+  AI_TONE_DESCRIPTIONS,
+  AI_TONE_LABELS,
+  AI_TONES,
+  type AiTone,
+} from "@/lib/ai/tone";
+import {
   AUTOSAVE_DEBOUNCE_MS,
   useDebouncedEffect,
 } from "@/lib/hooks/use-debounce";
@@ -37,6 +43,7 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
   const [primaryColor, setPrimaryColor] = useState(initialData.primary_color);
   const [accentColor, setAccentColor] = useState(initialData.accent_color);
   const [fontStyle, setFontStyle] = useState(initialData.font_style);
+  const [aiTone, setAiTone] = useState<AiTone>(initialData.ai_tone);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [lastSaved, setLastSaved] = useState(false);
@@ -49,7 +56,13 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
       logoPath: initialData.logo_path ?? null,
       logoUrl: initialData.logo_url ?? null,
     }),
-    [primaryColor, accentColor, fontStyle, initialData.logo_path, initialData.logo_url]
+    [
+      primaryColor,
+      accentColor,
+      fontStyle,
+      initialData.logo_path,
+      initialData.logo_url,
+    ]
   );
 
   const persistBrandKit = useCallback(async () => {
@@ -59,6 +72,7 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
       primary_color: primaryColor,
       accent_color: accentColor,
       font_style: fontStyle,
+      ai_tone: aiTone,
     });
     const actionError = getActionError(result);
     if (actionError) {
@@ -67,13 +81,13 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
       setLastSaved(true);
     }
     setSaving(false);
-  }, [name, primaryColor, accentColor, fontStyle]);
+  }, [name, primaryColor, accentColor, fontStyle, aiTone]);
 
   useDebouncedEffect(
     () => {
       void persistBrandKit();
     },
-    [name, primaryColor, accentColor, fontStyle],
+    [name, primaryColor, accentColor, fontStyle, aiTone],
     AUTOSAVE_DEBOUNCE_MS,
     { skipFirst: true }
   );
@@ -107,7 +121,7 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
           <CardHeader>
             <CardTitle as="h2">Brand settings</CardTitle>
             <CardDescription>
-              Colors and fonts applied to slide preview and PPTX export.
+              Colors, fonts, and AI writing tone for decks in this workspace.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -175,9 +189,32 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
                   <option value="mono">Monospace</option>
                 </select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="ai-tone">AI writing tone</Label>
+                <select
+                  id="ai-tone"
+                  value={aiTone}
+                  onChange={(e) => setAiTone(e.target.value as AiTone)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {AI_TONES.map((tone) => (
+                    <option key={tone} value={tone}>
+                      {AI_TONE_LABELS[tone]}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  {AI_TONE_DESCRIPTIONS[aiTone]} Applies to outline generation,
+                  slide fill, refresh, and rewrite.
+                </p>
+              </div>
               <div className="flex items-center justify-between gap-2">
                 <span className="text-sm text-muted-foreground">
-                  {saving ? "Saving…" : lastSaved ? "Saved" : "Changes autosave"}
+                  {saving
+                    ? "Saving…"
+                    : lastSaved
+                      ? "Saved"
+                      : "Changes autosave"}
                 </span>
                 <Button type="submit" disabled={saving} variant="outline">
                   {saving ? "Saving…" : "Save now"}
@@ -191,8 +228,8 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
           <CardHeader>
             <CardTitle as="h2">Logo</CardTitle>
             <CardDescription>
-              Shown on title slides in preview and export (PNG, JPEG, or SVG, max
-              2MB).
+              Shown on title slides in preview and export (PNG, JPEG, or SVG,
+              max 2MB).
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -222,7 +259,7 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
 
       <Card className="h-fit lg:sticky lg:top-8">
         <CardHeader>
-            <CardTitle as="h2">Live preview</CardTitle>
+          <CardTitle as="h2">Live preview</CardTitle>
           <CardDescription>
             Sample title slide with your current brand settings.
           </CardDescription>

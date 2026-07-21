@@ -2,6 +2,7 @@ import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { loadOrgAiTone } from "@/lib/ai/load-org-tone";
 import { buildSlideFillPrompt } from "@/lib/ai/prompts/slides";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
 import { replaceDeckSlidesAtomic } from "@/lib/decks/slide-mutations";
@@ -41,6 +42,8 @@ export async function fillDeckSlides(deckId: string, userId: string) {
     .select("*")
     .eq("project_id", deck.project_id)
     .single();
+
+  const aiTone = await loadOrgAiTone(supabase, deck.org_id);
 
   const promptBase = `deck:${deckId}:slides`;
   const promptHash = createHash("sha256").update(promptBase).digest("hex");
@@ -100,6 +103,7 @@ export async function fillDeckSlides(deckId: string, userId: string) {
         outlineSlide,
         slideIndex: index,
         totalSlides: outline.slides.length,
+        aiTone,
       });
 
       const { object, usage } = await generateObject({
