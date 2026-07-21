@@ -1,0 +1,41 @@
+---
+description: UpdateDeck Supabase schema and migrations
+globs: supabase/**
+alwaysApply: false
+---
+
+# Database
+
+## Schema (see `supabase/migrations/`)
+
+Core tables: `profiles`, `organizations`, `organization_members`, `projects`, `project_updates`, `decks`, `slides`, `slide_assets`, `brand_kits`, `exports`, `ai_generations`.
+
+## RLS
+
+- All public tables have RLS enabled
+- Access gated by `is_org_member(org_id)` helper (security definer)
+- Never disable RLS or use service role in user-facing code paths
+
+## Migrations
+
+- One migration per logical change; numbered `00N_description.sql`
+- Include RLS policies in the same migration as table creation
+- Test policies: member can CRUD own org data; non-member gets zero rows
+
+## JSONB columns
+
+- `project_updates.*` — structured update fields (goals, metrics, risks, etc.)
+- `slides.content` — matches `SlideContent` type
+- `decks.outline` — matches `DeckOutline` type
+
+## Storage buckets
+
+Path pattern: `{org_id}/{entity_id}/{filename}`
+
+Buckets: `screenshots`, `brand-logos`, `slide-assets`, `exports` (all private).
+
+## Rules
+
+- Index foreign keys (`deck_id`, `org_id`, `project_id`)
+- Use `timestamptz` for all timestamps
+- `ON DELETE CASCADE` for child rows; `SET NULL` only where intentional

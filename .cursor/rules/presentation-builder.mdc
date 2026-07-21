@@ -1,0 +1,51 @@
+---
+description: UpdateDeck slide deck builder — types, AI, export
+globs: src/lib/export/**, src/lib/ai/**, src/types/slide.ts, src/components/slides/**
+alwaysApply: false
+---
+
+# Presentation Builder
+
+## Slide contract (`src/types/slide.ts`)
+
+**Deck types:** `project_status`, `executive_update`, `weekly_report`, `rollout_plan`, `project_kickoff`, `client_presentation`
+
+**Layouts:** `title`, `bullets`, `metrics_grid`, `timeline`, `two_column`, `image_caption`, `chart`, `quote`, `section_break`
+
+**Slide shape:**
+```ts
+{ id, order, type, layout, title, content: SlideContent, speakerNotes?, metadata? }
+```
+
+`SlideContent` fields by layout:
+- `bullets` → `bullets: string[]`
+- `metrics_grid` → `metrics: { label, value, trend? }[]`
+- `chart` → `chartData: Record<string, string|number>[]`
+- `image_caption` → `imageUrl`, `imageAlt`, `body?`
+- `quote` → `quote`, `attribution?`
+- default body text → `body`
+
+## Outline → slides pipeline
+
+1. AI produces `DeckOutline` (titles, layouts, summaries)
+2. User approves outline → status `approved`
+3. Inngest job fills `SlideContent` per slide → status `ready`
+
+## Export (`lib/export/`)
+
+- Use `pptxgenjs`; one PPTX slide per app slide
+- Apply `brand_kits` (logo, primary/accent colors, font) when `apply_branding`
+- Map each layout to a PPTX master layout template
+- Upload result to `exports` bucket; update `exports` row
+
+## Component rules
+
+- `components/slides/` — one renderer per layout for preview
+- Preview renderer and export mapper must share layout logic (extract to `lib/export/layouts/`)
+- DnD reorder updates `order` field; persist batch on drop
+
+## Validation
+
+- Zod schema mirrors `Slide` / `DeckOutline` types
+- Reject unknown layouts or deck types at API boundary
+- Cap slides per deck (e.g., 40) to control AI cost

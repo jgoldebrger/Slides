@@ -1,0 +1,83 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "dark": {
+    "action": {
+      "primary": {
+        "$type": "color",
+        "$value": "{color.brand.400}"
+      },
+      "primary-hover": {
+        "$type": "color",
+        "$value": "{color.brand.300}"
+      },
+      "destructive": {
+        "$type": "color",
+        "$value": "{color.danger.500}"
+      }
+    },
+    "text": {
+      "primary": {
+        "$type": "color",
+        "$value": "{color.neutral.50}"
+      },
+      "secondary": {
+        "$type": "color",
+        "$value": "{color.neutral.400}"
+      },
+      "on-action": {
+        "$type": "color",
+        "$value": "{color.neutral.950}"
+      },
+      "link": {
+        "$type": "color",
+        "$value": "{color.brand.300}"
+      }
+    },
+    "surface": {
+      "page": {
+        "$type": "color",
+        "$value": "{color.neutral.950}"
+      },
+      "card": {
+        "$type": "color",
+        "$value": "{color.neutral.900}"
+      },
+      "raised": {
+        "$type": "color",
+        "$value": "{color.brand.950}"
+      },
+      "muted": {
+        "$type": "color",
+        "$value": "{color.brand.950}"
+      }
+    },
+    "border": {
+      "default": {
+        "$type": "color",
+        "$value": "{color.neutral.700}"
+      },
+      "strong": {
+        "$type": "color",
+        "$value": "{color.neutral.500}"
+      }
+    },
+    "feedback": {
+      "success": {
+        "$type": "color",
+        "$value": "{color.success.500}"
+      },
+      "warning": {
+        "$type": "color",
+        "$value": "{color.warning.500}"
+      },
+      "error": {
+        "$type": "color",
+        "$value": "{color.danger.500}"
+      },
+      "info": {
+        "$type": "color",
+        "$value": "{color.info.500}"
+      }
+    }
+  }
+}

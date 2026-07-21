@@ -1,0 +1,33 @@
+---
+description: UpdateDeck auth middleware and Supabase session
+globs: src/middleware.ts, src/lib/supabase/**
+alwaysApply: false
+---
+
+# Middleware
+
+## Session refresh
+
+`src/middleware.ts` delegates to `updateSession()` in `lib/supabase/middleware.ts`.
+
+- Refresh Supabase auth cookies on every matched request
+- Matcher excludes static assets and images
+- Do not add business logic here — keep middleware fast
+
+## Route protection
+
+- Public: `/`, `/login`, `/signup`, `/auth/callback`
+- Protected: everything under `/(dashboard)/`
+- Redirect unauthenticated users to `/login` with `?next=` return URL
+
+## Supabase SSR pattern
+
+- Use `@supabase/ssr` cookie helpers — never store tokens in localStorage
+- `createServerClient` in middleware with `getAll` / `setAll` cookie methods
+- Server and client factories must use the same cookie config
+
+## Do not
+
+- Call external APIs from middleware
+- Parse or trust custom auth headers without validation
+- Skip session refresh to "optimize" — stale sessions break RLS

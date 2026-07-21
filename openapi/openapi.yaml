@@ -1,0 +1,244 @@
+openapi: "3.1.0"
+info:
+  title: UpdateDeck Internal HTTP API
+  version: "0.1.0"
+  description: |
+    Cookie-session job and ops endpoints. The product UI primarily uses
+    Next.js Server Actions (`src/lib/actions/`). These HTTP routes mirror
+    enqueue operations for scripts, webhooks consumers, and future clients.
+
+    Authentication for deck routes: Supabase SSR session cookie
+    (same-origin browser or cookie jar). No Bearer API keys yet.
+servers:
+  - url: http://localhost:3000
+    description: Local
+  - url: "{origin}"
+    variables:
+      origin:
+        default: https://app.example.com
+
+tags:
+  - name: Jobs
+  - name: Ops
+  - name: Webhooks
+
+paths:
+  /api/health:
+    get:
+      tags: [Ops]
+      operationId: getHealth
+      summary: Liveness check
+      security: []
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, service, time]
+                properties:
+                  status: { type: string, example: ok }
+                  service: { type: string, example: updatedeck }
+                  time: { type: string, format: date-time }
+
+  /api/decks/{id}/outline:
+    post:
+      tags: [Jobs]
+      operationId: enqueueOutline
+      summary: Enqueue AI outline generation
+      parameters:
+        - $ref: "#/components/parameters/DeckId"
+      responses:
+        "200":
+          description: Job enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      success: { type: boolean }
+                      status: { type: string, example: processing }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /api/decks/{id}/generate:
+    post:
+      tags: [Jobs]
+      operationId: enqueueGenerate
+      summary: Enqueue slide content generation
+      parameters:
+        - $ref: "#/components/parameters/DeckId"
+      responses:
+        "200":
+          description: Job enqueued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DataEnvelope" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /api/decks/{id}/export:
+    post:
+      tags: [Jobs]
+      operationId: enqueueExport
+      summary: Enqueue PPTX export
+      parameters:
+        - $ref: "#/components/parameters/DeckId"
+      responses:
+        "200":
+          description: Export row created and job enqueued
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      success: { type: boolean }
+                      exportId: { type: string, format: uuid }
+                      status: { type: string, example: processing }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+        "500": { $ref: "#/components/responses/InternalError" }
+
+  /api/webhooks/stripe:
+    post:
+      tags: [Webhooks]
+      operationId: stripeWebhook
+      summary: Stripe billing events
+      security: []
+      parameters:
+        - name: stripe-signature
+          in: header
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Event received
+        "400":
+          description: Invalid signature or payload
+
+  /api/inngest:
+    get:
+      tags: [Ops]
+      operationId: inngestServeGet
+      summary: Inngest serve (SDK protocol)
+      security: []
+      responses:
+        "200":
+          description: Inngest protocol response
+    post:
+      tags: [Ops]
+      operationId: inngestServePost
+      summary: Inngest serve (SDK protocol)
+      security: []
+      responses:
+        "200":
+          description: Inngest protocol response
+    put:
+      tags: [Ops]
+      operationId: inngestServePut
+      summary: Inngest serve (SDK protocol)
+      security: []
+      responses:
+        "200":
+          description: Inngest protocol response
+
+components:
+  parameters:
+    DeckId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    DataEnvelope:
+      type: object
+      required: [data]
+      properties:
+        data: { type: object }
+
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                [
+                  bad_request,
+                  unauthorized,
+                  forbidden,
+                  not_found,
+                  conflict,
+                  rate_limit_exceeded,
+                  internal_error,
+                ]
+            message: { type: string }
+
+  responses:
+    BadRequest:
+      description: Invalid request or business rule
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    Unauthorized:
+      description: Missing or invalid session
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    Forbidden:
+      description: Authenticated but not allowed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    Conflict:
+      description: Job already in progress
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    TooManyRequests:
+      description: Org rate limit exceeded
+      headers:
+        Retry-After:
+          schema: { type: integer }
+          description: Seconds until the window resets
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+    InternalError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ApiError" }
+
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: sb-access-token
+      description: Supabase SSR auth cookies (browser session)
+
+security:
+  - SessionCookie: []

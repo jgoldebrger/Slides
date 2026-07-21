@@ -1,0 +1,49 @@
+---
+description: UpdateDeck third-party integrations
+globs: src/lib/**
+alwaysApply: false
+---
+
+# Integrations
+
+## Supabase
+
+- Auth, Postgres, Storage, RLS — primary backend
+- Clients in `lib/supabase/`; never duplicate client factories
+
+## OpenAI (Vercel AI SDK)
+
+- `lib/ai/` — prompt templates, outline generation, slide content fill
+- Model config via env; log usage to `ai_generations` table
+
+## Inngest
+
+- `lib/inngest/` — client, event definitions, function handlers
+- Events: `deck/generate`, `deck/export`, `email/send`
+- Verify signing key on webhook route
+
+## Stripe
+
+- `lib/stripe/` — checkout, portal, webhook handler
+- Map Stripe customer to org; sync subscription status to DB
+
+## Resend
+
+- Transactional email: welcome, export ready, invite
+- Templates in `lib/email/`; no marketing blasts from app code
+
+## Sentry
+
+- `@sentry/nextjs` — error tracking, performance traces
+- Tag events with `org_id` (non-PII) for debugging
+
+## PostHog
+
+- Client-side analytics in dashboard only
+- Track: deck created, outline approved, export completed
+
+## Rules
+
+- Wrap each provider in a thin lib module with typed interfaces
+- Graceful degradation when optional integrations are unconfigured (dev)
+- All webhooks: verify signature, return 200 quickly, process async

@@ -1,0 +1,47 @@
+---
+description: UpdateDeck project index — always read root docs first
+alwaysApply: true
+---
+
+# UpdateDeck
+
+AI-powered slide deck SaaS for project status updates. Next.js App Router, Supabase (auth + Postgres + storage), org-scoped multi-tenancy.
+
+## Read first
+
+| Doc | When |
+|-----|------|
+| [PROJECT.md](../../PROJECT.md) | Scope, stack, conventions |
+| [ARCHITECTURE.md](../../ARCHITECTURE.md) | System design, data flow |
+| [FRONTEND.md](../../FRONTEND.md) | App Router, components |
+| [BACKEND.md](../../BACKEND.md) | API routes, server libs |
+| [MIDDLEWARE.md](../../MIDDLEWARE.md) | Auth session refresh |
+| [DATABASE.md](../../DATABASE.md) | Schema, RLS, migrations |
+| [SECURITY.md](../../SECURITY.md) | AuthZ, secrets, validation |
+| [UX.md](../../UX.md) | User flows, accessibility |
+| [DESIGN.md](../../DESIGN.md) | Visual system, tokens |
+| [INTEGRATIONS.md](../../INTEGRATIONS.md) | Stripe, OpenAI, Inngest, etc. |
+| [TESTING.md](../../TESTING.md) | Vitest, Playwright |
+| [PERFORMANCE.md](../../PERFORMANCE.md) | Caching, bundle size |
+| [DOCS.md](../../DOCS.md) | Doc maintenance |
+
+## Stack
+
+- **Framework:** Next.js 15+ App Router, React 19, TypeScript
+- **Data:** Supabase (Postgres + RLS + Storage)
+- **UI:** Tailwind CSS 4, shadcn/ui, Radix
+- **AI:** Vercel AI SDK + OpenAI
+- **Export:** pptxgenjs
+- **Jobs:** Inngest | **Email:** Resend | **Billing:** Stripe
+
+## Conventions
+
+- Server Components by default; `'use client'` only when needed
+- All data access scoped by `org_id`; never bypass RLS
+- Types in `src/types/`; shared logic in `src/lib/`
+- Validate API input with Zod; return typed errors
+- Slide contract lives in `src/types/slide.ts` — do not diverge
+
+## Next.js note
+
+Read `node_modules/next/dist/docs/` before using unfamiliar APIs. This project may use newer Next.js conventions than your training data.

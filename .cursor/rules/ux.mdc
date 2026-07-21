@@ -1,0 +1,38 @@
+---
+description: UpdateDeck UX patterns for app and components
+globs: src/app/**, src/components/**
+alwaysApply: false
+---
+
+# UX
+
+## Core flows
+
+1. **Onboard** — signup creates profile + personal org automatically
+2. **Capture update** — structured project update form (goals, progress, risks, metrics)
+3. **Generate deck** — pick deck type → AI outline → review → approve → generate slides
+4. **Edit & export** — reorder slides, tweak content, export PPTX
+
+## Principles
+
+- Progressive disclosure: simple defaults, advanced options on demand
+- Always show deck status (`draft`, `outline`, `approved`, `generating`, `ready`)
+- Destructive actions require confirmation dialog
+- Empty states guide next action ("Add your first project")
+
+## Feedback
+
+- Loading skeletons for server-fetched lists
+- Spinner + status text during AI generation (can take 30s+)
+- Toast on save success; inline errors on validation failure
+
+## Accessibility
+
+- Keyboard-navigable slide editor and DnD alternatives
+- Focus trap in modals; `aria-label` on icon-only buttons
+- Color contrast meets WCAG AA; don't rely on color alone for status
+
+## Copy
+
+- Use "deck" and "slide" consistently
+- Error messages: what happened + what to do next

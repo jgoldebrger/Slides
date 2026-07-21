@@ -1,0 +1,42 @@
+---
+description: UpdateDeck design system for UI
+globs: src/app/**, src/components/**
+alwaysApply: false
+---
+
+# Design
+
+## Stack
+
+- Tailwind CSS 4 with CSS variables for tokens
+- shadcn/ui components in `components/ui/`
+- Icons: `lucide-react`
+
+## Tokens
+
+- Use semantic classes: `bg-background`, `text-foreground`, `border-border`, `text-muted-foreground`
+- Brand colors come from org `brand_kits` at export time; app chrome uses default theme
+- Spacing: Tailwind scale (4px base); rounded corners via `rounded-md` / `rounded-lg`
+
+## Typography
+
+- Headings: clear hierarchy (`text-2xl font-semibold` page titles)
+- Body: `text-sm` or `text-base` for content areas
+- Monospace for IDs, debug, code snippets only
+
+## Components
+
+- Cards for deck/project list items
+- Tabs for editor panels (content / notes / preview)
+- Buttons: primary for main CTA, outline for secondary, ghost for toolbar actions
+
+## Slide preview
+
+- 16:9 aspect ratio container
+- Layout-specific templates mirror export output
+- Respect brand kit colors in preview when `apply_branding` is true
+
+## Do not
+
+- Raw hex in components (use CSS variables or Tailwind theme)
+- One-off spacing values outside the scale without reason

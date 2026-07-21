@@ -1,0 +1,40 @@
+---
+description: UpdateDeck architecture patterns for src/
+globs: src/**/*
+alwaysApply: false
+---
+
+# Architecture
+
+## Layers
+
+```
+app/          → routes, pages, API handlers (thin)
+components/   → UI (presentational + feature)
+lib/          → business logic, integrations, Supabase clients
+types/        → shared TypeScript contracts
+middleware.ts → session refresh only
+```
+
+## Domain model
+
+`Organization → Project → ProjectUpdate → Deck → Slide → Export`
+
+- Every tenant row carries `org_id`; RLS enforces membership via `is_org_member()`
+- Deck lifecycle: `draft → outline → approved → generating → ready`
+- Slide content is JSONB matching `Slide` / `SlideContent` types
+
+## Data flow
+
+1. **Read:** Server Component → Supabase server client → RLS-filtered query
+2. **Write:** Server Action or API route → validate (Zod) → Supabase → revalidate path
+3. **AI generate:** API route → Inngest job → OpenAI → persist slides → update deck status
+4. **Export:** API route → Inngest job → pptxgenjs → Supabase Storage → export record
+
+## Rules
+
+- Keep route handlers thin; extract logic to `src/lib/`
+- No direct DB access from client components
+- Prefer Server Actions for mutations; API routes for webhooks and long-running jobs
+- Co-locate feature code by domain (`lib/ai/`, `lib/export/`, `components/slides/`)
+- Do not create circular imports between `lib/` modules

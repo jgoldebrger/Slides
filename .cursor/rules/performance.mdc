@@ -1,0 +1,39 @@
+---
+description: UpdateDeck performance guidelines
+globs: src/**
+alwaysApply: false
+---
+
+# Performance
+
+## Server
+
+- Fetch only needed columns; avoid `select('*')` on wide JSONB rows
+- Parallelize independent Supabase queries with `Promise.all`
+- Use `revalidatePath` / `revalidateTag` surgically — not global revalidation
+
+## Client
+
+- Dynamic import heavy libs (`pptxgenjs`, `recharts`) only in export/preview paths
+- Virtualize long slide lists if > 50 slides
+- Debounce autosave in slide editor (300–500ms)
+
+## Images
+
+- `next/image` for screenshots and brand logos
+- Store originals in Supabase Storage; serve via signed URLs
+
+## AI & jobs
+
+- Never block HTTP response on OpenAI calls — use Inngest
+- Stream outline generation to UI when possible (AI SDK streaming)
+
+## Bundle
+
+- Audit with `@next/bundle-analyzer` before adding large deps
+- Tree-shake lucide icons (import individual icons, not barrel)
+
+## Monitoring
+
+- Sentry for errors; PostHog for Web Vitals and funnel metrics
+- Track p95 for deck generation and export completion times

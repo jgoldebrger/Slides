@@ -1,0 +1,39 @@
+---
+description: UpdateDeck frontend — App Router and components
+globs: src/app/**, src/components/**
+alwaysApply: false
+---
+
+# Frontend
+
+## App Router
+
+- `src/app/(auth)/` — login, signup, callback
+- `src/app/(dashboard)/` — org-scoped app shell
+- Route groups for layout sharing; dynamic `[orgSlug]`, `[projectId]`, `[deckId]`
+- `loading.tsx` and `error.tsx` per major route segment
+
+## Components
+
+- **Server Components** for data fetching and static layout
+- **Client Components** (`'use client'`) for interactivity: DnD, forms, editor, modals
+- UI primitives in `components/ui/` (shadcn); feature components in `components/slides/`, `components/decks/`
+- Use `cn()` from `lib/utils` for class merging
+
+## Forms
+
+- react-hook-form + Zod resolver
+- Optimistic UI only where rollback is safe
+- Toast feedback via `sonner`
+
+## Slide editor
+
+- Drag-and-drop reorder via `@dnd-kit`
+- Layout picker maps to `SLIDE_LAYOUTS` from `src/types/slide.ts`
+- Preview must match export layout semantics
+
+## Do not
+
+- Fetch secrets or service-role data in client components
+- Use `useEffect` for data that belongs in Server Components
+- Inline styles; use Tailwind + design tokens from DESIGN.md

@@ -1,0 +1,47 @@
+import { describe, it, expect } from "vitest";
+import { projectSchema, deckOutlineSchema } from "@/lib/validations";
+
+describe("projectSchema", () => {
+  it("accepts valid project", () => {
+    const result = projectSchema.safeParse({
+      name: "Q3 Launch",
+      description: "Product launch",
+      status: "active",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty name", () => {
+    const result = projectSchema.safeParse({ name: "" });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("deckOutlineSchema", () => {
+  it("accepts valid outline", () => {
+    const result = deckOutlineSchema.safeParse({
+      deckType: "project_status",
+      slides: [
+        {
+          title: "Title",
+          layout: "title",
+          type: "title",
+          summary: "Opening slide",
+        },
+        {
+          title: "Progress",
+          layout: "bullets",
+          type: "content",
+          summary: "Key progress items",
+        },
+        {
+          title: "Next steps",
+          layout: "bullets",
+          type: "content",
+          summary: "Upcoming work",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+});

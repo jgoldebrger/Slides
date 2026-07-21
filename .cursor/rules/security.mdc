@@ -1,0 +1,47 @@
+---
+description: UpdateDeck security requirements
+globs: "**/*"
+alwaysApply: false
+---
+
+# Security
+
+## Auth & AuthZ
+
+- Supabase Auth for identity; RLS for data access
+- Verify org membership on every mutation — UI hiding is not security
+- Role checks (`owner`, `admin`, `member`) for destructive org actions
+
+## Secrets
+
+- All keys in env vars (see `.env.example`); never commit `.env*`
+- `SUPABASE_SERVICE_ROLE_KEY` server-only; never `NEXT_PUBLIC_*`
+- Rotate keys via provider dashboards, not code
+
+## Input validation
+
+- Zod on all API/Action inputs
+- Sanitize user HTML if rich text is added later
+- Reject path traversal in storage uploads; validate MIME types
+
+## AI safety
+
+- Do not send secrets or PII in prompts
+- Hash prompts in `ai_generations.prompt_hash` for audit
+- Cap token usage per org; timeout long generations
+
+## Payments
+
+- Verify Stripe webhook signatures
+- Never trust client-side payment state; confirm via webhook + DB
+
+## Headers & CSP
+
+- Use Next.js security headers in production
+- Sentry scrubs PII from error reports
+
+## Forbidden
+
+- Bypassing RLS with service role in user requests
+- `eval`, dynamic `require`, shell execution with user input
+- Logging tokens, passwords, or full auth cookies

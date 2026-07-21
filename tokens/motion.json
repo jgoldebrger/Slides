@@ -1,0 +1,28 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "duration": {
+    "instant": { "$type": "duration", "$value": "0ms" },
+    "fast": { "$type": "duration", "$value": "120ms" },
+    "normal": { "$type": "duration", "$value": "200ms" },
+    "slow": { "$type": "duration", "$value": "320ms" }
+  },
+  "easing": {
+    "standard": {
+      "$type": "cubicBezier",
+      "$value": [0.2, 0, 0, 1]
+    },
+    "emphasized": {
+      "$type": "cubicBezier",
+      "$value": [0.3, 0, 0, 1]
+    }
+  },
+  "motion": {
+    "slideEnter": {
+      "$type": "transition",
+      "$value": {
+        "duration": "{duration.normal}",
+        "timingFunction": "{easing.standard}"
+      }
+    }
+  }
+}

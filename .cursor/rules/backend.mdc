@@ -1,0 +1,40 @@
+---
+description: UpdateDeck backend — lib and API routes
+globs: src/lib/**, src/app/api/**
+alwaysApply: false
+---
+
+# Backend
+
+## API routes (`src/app/api/`)
+
+- REST-ish JSON; consistent `{ data }` / `{ error: { code, message } }` shape
+- Auth: read session from Supabase server client; reject unauthenticated requests
+- AuthZ: verify `org_id` membership before any org-scoped operation
+- Validate request body with Zod schemas in `src/lib/validations/`
+
+## Server Actions
+
+- Use for form mutations from Server/Client Components
+- Always revalidate affected paths after writes
+- Return `{ success, error? }` — never throw to the client for expected failures
+
+## Supabase clients
+
+| Client | Use |
+|--------|-----|
+| `lib/supabase/server.ts` | Server Components, Actions, API routes |
+| `lib/supabase/client.ts` | Browser auth only |
+| Service role | Inngest jobs / admin scripts only — never expose to client |
+
+## Long-running work
+
+- AI generation and PPTX export run via Inngest, not inline in request handlers
+- Update `decks.status` and `exports.status` atomically
+- Log failures to Sentry; store error on row for user visibility
+
+## Rules
+
+- Parameterized Supabase queries only; no string-built SQL
+- Idempotent webhook handlers (Stripe, Inngest)
+- Rate-limit AI and export endpoints per org
