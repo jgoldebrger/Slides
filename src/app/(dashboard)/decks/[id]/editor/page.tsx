@@ -13,7 +13,7 @@ import { EmptyState } from "@/components/shared/state";
 import { requireDeckAccess } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { audienceFromDeckMetadata } from "@/lib/ai/load-deck-audience";
-import type { DeckQaResult } from "@/lib/ai/schemas/deck-ai";
+import { parseDeckMetadata } from "@/lib/validations/deck-metadata";
 import { Button } from "@/components/ui/button";
 import { redirectViewerFromDeckEdit } from "@/lib/viewer-guard";
 
@@ -99,10 +99,7 @@ export default async function DeckEditorPage({
     .limit(1)
     .maybeSingle();
 
-  const metadata = (deck.metadata as {
-    shareBlurb?: string;
-    lastQa?: DeckQaResult;
-  }) ?? {};
+  const metadata = parseDeckMetadata(deck.metadata);
   const audience = audienceFromDeckMetadata(deck.metadata);
 
   return (
