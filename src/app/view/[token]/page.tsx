@@ -55,7 +55,9 @@ function ShareUnavailable({ reason }: { reason: "invalid" | "expired" }) {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle as="h1">
-            {reason === "expired" ? "This link has expired" : "Link unavailable"}
+            {reason === "expired"
+              ? "This link has expired"
+              : "This share link is unavailable"}
           </CardTitle>
           <CardDescription>
             {reason === "expired"
@@ -84,7 +86,13 @@ export default async function SharedDeckViewPage({
   }
 
   const tokenHash = hashShareToken(token);
-  const supabase = createAdminClient();
+
+  let supabase;
+  try {
+    supabase = createAdminClient();
+  } catch {
+    return <ShareUnavailable reason="invalid" />;
+  }
 
   const { data: anyLink } = await supabase
     .from("deck_share_links")
