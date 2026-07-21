@@ -22,7 +22,9 @@
 
 **Purpose:** Background jobs (AI generation, PPTX export, email)
 
-**Config:** `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`
+**Config:** `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY` (production). Local dev uses `INNGEST_DEV=1` via `npm run dev:all` — no keys required.
+
+**Vercel:** Install the [Inngest Vercel integration](https://www.inngest.com/docs/deploy/vercel) or copy both keys from Inngest → Manage → Keys into your Vercel project environment variables, then redeploy.
 
 **Code:** `src/lib/inngest/`
 

@@ -289,9 +289,7 @@ export async function createSlideBackground(
       generationId: genLog.id as string,
     };
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Background generation failed";
-    return { error: message };
+    return { error: toPublicError(err, "Background generation failed") };
   }
 }
 
@@ -344,9 +342,7 @@ export async function createDeckBackground(deckId: string, formData: FormData) {
       generationId: genLog.id as string,
     };
   } catch (err) {
-    const message =
-      err instanceof Error ? err.message : "Background generation failed";
-    return { error: message };
+    return { error: toPublicError(err, "Background generation failed") };
   }
 }
 
