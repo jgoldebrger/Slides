@@ -72,7 +72,7 @@ export function accentNeedsReadableAdjust(accent: string, minRatio = 3): boolean
  */
 export function ensureContrastOnWhite(color: string, minRatio = 3): string {
   const ratio = contrastRatio(color, WHITE);
-  if (ratio != null && ratio >= minRatio) return normalizeHex(color) ?? color;
+  if (ratio != null && ratio >= minRatio) return color;
 
   const parsed = parseHex(color);
   if (!parsed) return "#525252";
@@ -98,12 +98,6 @@ export function ensureContrastOnWhite(color: string, minRatio = 3): string {
   }
 
   return "#525252";
-}
-
-function normalizeHex(hex: string): string | null {
-  const p = parseHex(hex);
-  if (!p) return null;
-  return toHex(p.r, p.g, p.b);
 }
 
 function mix(a: number, b: number, t: number): number {
