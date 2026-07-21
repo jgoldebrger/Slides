@@ -1,5 +1,6 @@
 import { sendDeckEvent } from "@/lib/inngest/events";
 import { claimDeckJob } from "@/lib/decks/claim-job";
+import type { RevisionReason } from "@/lib/decks/revisions";
 import { PublicError } from "@/lib/errors/public-error";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
