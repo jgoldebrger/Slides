@@ -5,6 +5,11 @@ import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
 import { saveProjectUpdate, uploadScreenshot } from "@/lib/actions/projects";
 import {
+  generateUpdateDiffNarrative,
+  parseMeetingNotesToUpdate,
+  saveProjectUpdateWithSnapshot,
+} from "@/lib/actions/project-ai";
+import {
   AUTOSAVE_DEBOUNCE_MS,
   useDebouncedEffect,
 } from "@/lib/hooks/use-debounce";
@@ -49,6 +54,10 @@ export function ProjectUpdatesForm({
   const [lastSaved, setLastSaved] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [showMore, setShowMore] = useState(false);
+  const [meetingNotes, setMeetingNotes] = useState("");
+  const [importingNotes, setImportingNotes] = useState(false);
+  const [updateNarrative, setUpdateNarrative] = useState<string | null>(null);
+  const [narrativeLoading, setNarrativeLoading] = useState(false);
 
   const persistUpdates = useCallback(async () => {
     setSaving(true);
@@ -135,8 +144,84 @@ export function ProjectUpdatesForm({
     }));
   }
 
+  async function handleImportMeetingNotes() {
+    setImportingNotes(true);
+    const result = await parseMeetingNotesToUpdate(projectId, meetingNotes);
+    const actionError = getActionError(result);
+    if (actionError) {
+      toast.error(actionError);
+    } else if ("data" in result && result.data) {
+      setData((prev) => ({
+        ...prev,
+        goals: result.data.goals.length ? result.data.goals : prev.goals,
+        progress: result.data.progress || prev.progress,
+        completed_work: result.data.completed_work.length ? result.data.completed_work : prev.completed_work,
+        current_tasks: result.data.current_tasks.length ? result.data.current_tasks : prev.current_tasks,
+        milestones: result.data.milestones.length ? result.data.milestones : prev.milestones,
+        metrics: result.data.metrics.length ? result.data.metrics : prev.metrics,
+        risks: result.data.risks.length ? result.data.risks : prev.risks,
+        blockers: result.data.blockers.length ? result.data.blockers : prev.blockers,
+        next_steps: result.data.next_steps.length ? result.data.next_steps : prev.next_steps,
+      }));
+      toast.success("Meeting notes imported — review and save");
+      setDirty(true);
+    }
+    setImportingNotes(false);
+  }
+
+  async function handleUpdateNarrative() {
+    setNarrativeLoading(true);
+    const result = await generateUpdateDiffNarrative(projectId);
+    const actionError = getActionError(result);
+    if (actionError) toast.error(actionError);
+    else if ("narrative" in result) {
+      setUpdateNarrative(`${result.narrative}\n\n${result.highlights?.map((h) => `• ${h}`).join("\n") ?? ""}`);
+      toast.success("Change narrative ready");
+    }
+    setNarrativeLoading(false);
+  }
+
+  async function handleSaveWithSnapshot() {
+    setSaving(true);
+    const result = await saveProjectUpdateWithSnapshot(projectId, data);
+    if ("error" in result && result.error) {
+      toast.error(typeof result.error === "string" ? result.error : "Save failed");
+    } else {
+      setLastSaved(true);
+      setDirty(false);
+      toast.success("Saved with snapshot for diff narrative");
+    }
+    setSaving(false);
+  }
+
   return (
     <div className="space-y-6">
+      <section className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
+        <Label htmlFor="meeting-notes">Import from meeting notes</Label>
+        <textarea
+          id="meeting-notes"
+          rows={4}
+          value={meetingNotes}
+          onChange={(e) => setMeetingNotes(e.target.value)}
+          placeholder="Paste notes or transcript…"
+          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        />
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" disabled={importingNotes || !meetingNotes.trim()} onClick={() => void handleImportMeetingNotes()}>
+            {importingNotes ? "Importing…" : "Import to update"}
+          </Button>
+          <Button type="button" variant="outline" size="sm" disabled={narrativeLoading} onClick={() => void handleUpdateNarrative()}>
+            {narrativeLoading ? "Generating…" : "What changed?"}
+          </Button>
+          <Button type="button" variant="outline" size="sm" disabled={saving} onClick={() => void handleSaveWithSnapshot()}>
+            Save with snapshot
+          </Button>
+        </div>
+        {updateNarrative && (
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{updateNarrative}</p>
+        )}
+      </section>
+
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <p>
           Start with goals, progress, metrics, and risks. Open more fields when

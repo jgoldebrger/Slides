@@ -57,10 +57,12 @@ export async function enqueueRefreshDeckJob({
   supabase,
   deck,
   userId,
+  revisionReason,
 }: {
   supabase: SupabaseClient;
   deck: DeckRow;
   userId: string;
+  revisionReason?: RevisionReason;
 }) {
   const claimed = await claimDeckJob(
     supabase,
@@ -78,6 +80,7 @@ export async function enqueueRefreshDeckJob({
       deckId: deck.id,
       userId,
       orgId: deck.org_id,
+      revisionReason,
     });
   } catch {
     await supabase

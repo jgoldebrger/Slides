@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { loadOrgAiTone } from "@/lib/ai/load-org-tone";
+import { loadDeckAudience } from "@/lib/ai/load-deck-audience";
 import { buildRewriteSlidePrompt } from "@/lib/ai/prompts/rewrite";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -11,11 +12,13 @@ export async function runRewriteSlide({
   deckId,
   slideId,
   generationId,
+  instructions,
 }: {
   deckId: string;
   slideId: string;
   userId: string;
   generationId: string;
+  instructions?: string;
 }) {
   const supabase = createAdminClient();
 
@@ -47,6 +50,7 @@ export async function runRewriteSlide({
     if (slideError || !slide) throw new Error("Slide not found");
 
     const aiTone = await loadOrgAiTone(supabase, deck.org_id);
+    const audience = await loadDeckAudience(supabase, deckId);
     const layout = slide.layout as SlideLayout;
     const { object } = await generateObject({
       model: openai("gpt-4o-mini"),
@@ -56,6 +60,8 @@ export async function runRewriteSlide({
         title: slide.title,
         content: slide.content,
         aiTone,
+        audience,
+        instructions,
       }),
     });
 
@@ -110,8 +116,8 @@ export async function runRewriteSlide({
   }
 }
 
-export function rewritePromptHash(slideId: string) {
+export function rewritePromptHash(slideId: string, instructions?: string) {
   return createHash("sha256")
-    .update(`rewrite:${slideId}:${Date.now()}`)
+    .update(`rewrite:${slideId}:${instructions ?? ""}:${Date.now()}`)
     .digest("hex");
 }

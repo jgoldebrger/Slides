@@ -15,6 +15,12 @@ import {
   saveOutline,
   approveOutline,
 } from "@/lib/actions/decks";
+import { updateDeckAudience } from "@/lib/actions/ai-enhancements";
+import {
+  DECK_AUDIENCES,
+  DECK_AUDIENCE_LABELS,
+  type DeckAudience,
+} from "@/lib/ai/audience";
 import { SLIDE_LAYOUTS } from "@/types/slide";
 import type { DeckOutline, OutlineSlide } from "@/types/slide";
 import { Button } from "@/components/ui/button";
@@ -34,6 +40,7 @@ type OutlineEditorProps = {
   deckName: string;
   initialOutline: DeckOutline | null;
   deckStatus: string;
+  initialAudience?: DeckAudience;
 };
 
 export function OutlineEditor({
@@ -41,6 +48,7 @@ export function OutlineEditor({
   deckName,
   initialOutline,
   deckStatus,
+  initialAudience = "general",
 }: OutlineEditorProps) {
   const router = useRouter();
   const [outline, setOutline] = useState<DeckOutline | null>(initialOutline);
@@ -51,6 +59,8 @@ export function OutlineEditor({
   const [removeIndex, setRemoveIndex] = useState<number | null>(null);
   const [dirty, setDirty] = useState(false);
   const [autoSaved, setAutoSaved] = useState(false);
+  const [audience, setAudience] = useState<DeckAudience>(initialAudience);
+  const [streaming, setStreaming] = useState(false);
 
   const persistOutline = useCallback(async () => {
     if (!outline || !dirty) return;
@@ -115,9 +125,59 @@ export function OutlineEditor({
     await runGenerate();
   }
 
-  async function runGenerate() {
+  async function runGenerate(useStream = true) {
     setConfirmRegenerateOpen(false);
     setGenerating(true);
+
+    if (useStream) {
+      setStreaming(true);
+      try {
+        const res = await fetch(`/api/decks/${deckId}/outline/stream`, {
+          method: "POST",
+        });
+        if (!res.ok || !res.body) {
+          throw new Error("Stream unavailable");
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const event = JSON.parse(line) as {
+              type: string;
+              outline?: DeckOutline;
+              error?: string;
+            };
+            if (event.type === "partial" && event.outline) {
+              setOutline(event.outline);
+            }
+            if (event.type === "complete" && event.outline) {
+              setOutline(event.outline);
+              toast.success("Outline generated");
+              router.refresh();
+            }
+            if (event.type === "error") {
+              throw new Error(event.error ?? "Stream failed");
+            }
+          }
+        }
+        setDirty(false);
+        setGenerating(false);
+        setStreaming(false);
+        return;
+      } catch {
+        setStreaming(false);
+        toast.message("Falling back to standard generation…");
+      }
+    }
+
     const result = await enqueueOutlineGeneration(deckId);
     const actionError = getActionError(result);
     if (actionError) {
@@ -131,6 +191,17 @@ export function OutlineEditor({
       toast.info("Generating outline…");
     }
     setDirty(false);
+  }
+
+  async function handleAudienceChange(next: DeckAudience) {
+    setAudience(next);
+    const result = await updateDeckAudience(deckId, next);
+    const actionError = getActionError(result);
+    if (actionError) {
+      toast.error(actionError);
+      return;
+    }
+    toast.success(`Audience set to ${DECK_AUDIENCE_LABELS[next]}`);
   }
 
   async function handleSave() {
@@ -198,6 +269,27 @@ export function OutlineEditor({
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="outline-audience">Target audience</Label>
+          <select
+            id="outline-audience"
+            value={audience}
+            onChange={(e) =>
+              void handleAudienceChange(e.target.value as DeckAudience)
+            }
+            disabled={generating}
+            className="flex h-10 min-w-[200px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            {DECK_AUDIENCES.map((a) => (
+              <option key={a} value={a}>
+                {DECK_AUDIENCE_LABELS[a]}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <Button
           variant={outline ? "outline" : "default"}
@@ -233,7 +325,9 @@ export function OutlineEditor({
 
       {generating && (
         <p className="text-sm text-muted-foreground" role="status">
-          AI is building your outline from project updates…
+          {streaming
+            ? "Streaming outline slides as they are generated…"
+            : "AI is building your outline from project updates…"}
         </p>
       )}
 

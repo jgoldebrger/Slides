@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { projectSchema, deckOutlineSchema } from "@/lib/validations";
+import { projectSchema, deckOutlineSchema, rewriteInstructionsSchema } from "@/lib/validations";
 
 describe("projectSchema", () => {
   it("accepts valid project", () => {
@@ -43,5 +43,28 @@ describe("deckOutlineSchema", () => {
       ],
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("rewriteInstructionsSchema", () => {
+  it("trims and accepts valid instructions", () => {
+    const result = rewriteInstructionsSchema.safeParse("  shorter  ");
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toBe("shorter");
+    }
+  });
+
+  it("returns undefined for blank instructions", () => {
+    const result = rewriteInstructionsSchema.safeParse("   ");
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toBeUndefined();
+    }
+  });
+
+  it("rejects instructions over 500 characters", () => {
+    const result = rewriteInstructionsSchema.safeParse("a".repeat(501));
+    expect(result.success).toBe(false);
   });
 });

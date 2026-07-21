@@ -26,6 +26,7 @@ type SlideListProps = {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onReorder: (orderedIds: string[]) => void;
+  changedSlideIds?: Set<string>;
 };
 
 function SortableSlideItem({
@@ -36,6 +37,7 @@ function SortableSlideItem({
   onSelect,
   onMoveUp,
   onMoveDown,
+  isChanged,
 }: {
   slide: Slide;
   index: number;
@@ -44,6 +46,7 @@ function SortableSlideItem({
   onSelect: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
+  isChanged?: boolean;
 }) {
   const {
     attributes,
@@ -67,7 +70,9 @@ function SortableSlideItem({
         "flex items-center gap-1 rounded-lg border px-2 py-2 text-sm",
         isSelected
           ? "border-primary bg-accent"
-          : "border-border bg-card hover:bg-accent/50",
+          : isChanged
+            ? "border-amber-500/50 bg-amber-500/10"
+            : "border-border bg-card hover:bg-accent/50",
         isDragging && "opacity-50"
       )}
     >
@@ -120,6 +125,7 @@ export function SlideList({
   selectedId,
   onSelect,
   onReorder,
+  changedSlideIds,
 }: SlideListProps) {
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -168,6 +174,7 @@ export function SlideList({
                 index={index}
                 total={slides.length}
                 isSelected={selectedId === slide.id}
+                isChanged={changedSlideIds?.has(slide.id)}
                 onSelect={() => onSelect(slide.id)}
                 onMoveUp={() => moveSlide(index, index - 1)}
                 onMoveDown={() => moveSlide(index, index + 1)}

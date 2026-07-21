@@ -1,5 +1,6 @@
 import { layoutFillHint } from "@/lib/slides/layout-contract";
 import { aiTonePromptHint, type AiTone } from "@/lib/ai/tone";
+import { audiencePromptHint, type DeckAudience } from "@/lib/ai/audience";
 import type { DeckType, OutlineSlide } from "@/types/slide";
 
 export function buildSlideFillPrompt({
@@ -11,6 +12,8 @@ export function buildSlideFillPrompt({
   slideIndex,
   totalSlides,
   aiTone = "executive",
+  audience = "general",
+  extraHints = [],
 }: {
   deckType: DeckType;
   projectName: string;
@@ -20,7 +23,14 @@ export function buildSlideFillPrompt({
   slideIndex: number;
   totalSlides: number;
   aiTone?: AiTone;
+  audience?: DeckAudience;
+  extraHints?: string[];
 }) {
+  const hintsBlock =
+    extraHints.length > 0
+      ? `\nAdditional guidance:\n${extraHints.map((h) => `- ${h}`).join("\n")}\n`
+      : "";
+
   return `You are an expert presentation writer for project update decks.
 
 Fill slide ${slideIndex + 1} of ${totalSlides} for a "${deckType}" deck.
@@ -28,10 +38,14 @@ Fill slide ${slideIndex + 1} of ${totalSlides} for a "${deckType}" deck.
 Voice / tone:
 - ${aiTonePromptHint(aiTone)}
 
+Target audience:
+- ${audiencePromptHint(audience)}
+
 Rules:
 - Use ONLY facts from the project data below. Do not invent metrics, dates, or achievements.
 - Match the requested layout: ${outlineSlide.layout}
 - ${layoutFillHint(outlineSlide.layout)}
+${hintsBlock}${outlineSlide.layout === "chart" ? "- For chart slides: include a one-sentence takeaway in body and chartData sourced from project metrics." : ""}
 - Write clear copy suitable for a live presentation.
 - Include brief speaker notes for the presenter.
 

@@ -3,6 +3,9 @@ import { openai } from "@ai-sdk/openai";
 import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadOrgAiTone } from "@/lib/ai/load-org-tone";
+import { loadDeckAudience } from "@/lib/ai/load-deck-audience";
+import { loadOrgDeckStyle } from "@/lib/ai/load-org-deck-style";
+import { layoutSuggestionHint } from "@/lib/ai/suggest-layout";
 import { buildSlideFillPrompt } from "@/lib/ai/prompts/slides";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
 import { replaceDeckSlidesAtomic } from "@/lib/decks/slide-mutations";
@@ -44,6 +47,8 @@ export async function fillDeckSlides(deckId: string, userId: string) {
     .single();
 
   const aiTone = await loadOrgAiTone(supabase, deck.org_id);
+  const audience = await loadDeckAudience(supabase, deckId);
+  const orgStyle = await loadOrgDeckStyle(supabase, deck.org_id, deckId);
 
   const promptBase = `deck:${deckId}:slides`;
   const promptHash = createHash("sha256").update(promptBase).digest("hex");
@@ -95,6 +100,10 @@ export async function fillDeckSlides(deckId: string, userId: string) {
 
     for (let index = 0; index < outline.slides.length; index += 1) {
       const outlineSlide = outline.slides[index]!;
+      const layoutHint = layoutSuggestionHint(
+        outlineSlide.title,
+        outlineSlide.summary ?? ""
+      );
       const prompt = buildSlideFillPrompt({
         deckType: deck.type as DeckType,
         projectName: project?.name ?? "Project",
@@ -104,6 +113,11 @@ export async function fillDeckSlides(deckId: string, userId: string) {
         slideIndex: index,
         totalSlides: outline.slides.length,
         aiTone,
+        audience,
+        extraHints: [
+          layoutHint,
+          orgStyle?.hint,
+        ].filter(Boolean) as string[],
       });
 
       const { object, usage } = await generateObject({

@@ -246,7 +246,7 @@ export async function attachSlideVisual(
   if ("error" in validated) return { error: validated.error };
   const uploadFile = validated.file;
 
-  const { supabase, deck } = await requireDeckEdit(deckId);
+  const { supabase, deck, user } = await requireDeckEdit(deckId);
 
   const { data: slide, error: slideError } = await supabase
     .from("slides")
@@ -303,6 +303,15 @@ export async function attachSlideVisual(
       "slide-assets",
       sourcePath
     );
+
+    const { enqueueAutoAltText } = await import("@/lib/ai/run-narrate-deck");
+    await enqueueAutoAltText({
+      supabase,
+      deckId,
+      slideId,
+      orgId: deck.org_id,
+      userId: user.id,
+    });
 
     revalidatePath(`/decks/${deckId}/editor`);
 

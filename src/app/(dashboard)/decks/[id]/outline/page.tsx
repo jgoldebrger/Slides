@@ -5,6 +5,7 @@ import { OutlineEditor } from "@/components/decks/outline-editor";
 import { deckPageTitle } from "@/lib/page-title";
 import { requireDeckAccess } from "@/lib/permissions";
 import { redirectViewerFromDeckEdit } from "@/lib/viewer-guard";
+import { audienceFromDeckMetadata } from "@/lib/ai/load-deck-audience";
 import type { DeckOutline } from "@/types/slide";
 
 export async function generateMetadata({
@@ -33,6 +34,7 @@ export default async function DeckOutlinePage({
   }
 
   const outline = deck.outline as DeckOutline | null;
+  const audience = audienceFromDeckMetadata(deck.metadata);
 
   return (
     <div className="space-y-6">
@@ -56,6 +58,7 @@ export default async function DeckOutlinePage({
         deckName={deck.name}
         initialOutline={outline}
         deckStatus={deck.status}
+        initialAudience={audience}
       />
     </div>
   );

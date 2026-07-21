@@ -9,6 +9,11 @@ import {
   listDeckShareLinks,
   revokeDeckShareLink,
 } from "@/lib/actions/share-links";
+import {
+  generateShareBlurb,
+  getDeckShareBlurb,
+  sendDeckShareEmail,
+} from "@/lib/actions/ai-enhancements";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,11 +38,13 @@ export type ShareLinkRow = {
 type DeckSharePanelProps = {
   deckId: string;
   initialLinks?: ShareLinkRow[];
+  initialBlurb?: string | null;
 };
 
 export function DeckSharePanel({
   deckId,
   initialLinks = [],
+  initialBlurb = null,
 }: DeckSharePanelProps) {
   const [open, setOpen] = useState(false);
   const [links, setLinks] = useState<ShareLinkRow[]>(initialLinks);
@@ -47,6 +54,10 @@ export function DeckSharePanel({
   const [copied, setCopied] = useState(false);
   const [revokeId, setRevokeId] = useState<string | null>(null);
   const [revoking, setRevoking] = useState(false);
+  const [shareBlurb, setShareBlurb] = useState(initialBlurb ?? "");
+  const [generatingBlurb, setGeneratingBlurb] = useState(false);
+  const [shareEmail, setShareEmail] = useState("");
+  const [sendingEmail, setSendingEmail] = useState(false);
 
   async function refreshLinks() {
     const result = await listDeckShareLinks(deckId);
@@ -104,6 +115,70 @@ export function DeckSharePanel({
     setRevoking(false);
   }
 
+  async function handleGenerateBlurb() {
+    setGeneratingBlurb(true);
+    try {
+      const result = await generateShareBlurb(deckId);
+      const actionError = getActionError(result);
+      if (actionError) {
+        toast.error(actionError);
+        return;
+      }
+      if (!("generationId" in result) || !result.generationId) {
+        toast.error("Failed to start share blurb");
+        return;
+      }
+      toast.message("Writing share blurb…");
+      const { pollAiGeneration } = await import(
+        "@/lib/hooks/poll-ai-generation"
+      );
+      const done = await pollAiGeneration(deckId, result.generationId);
+      const blurbResult = done.result as { blurb?: string } | null;
+      if (blurbResult?.blurb) {
+        setShareBlurb(blurbResult.blurb);
+        toast.success("Share blurb ready");
+      } else {
+        const { blurb } = await getDeckShareBlurb(deckId);
+        if (blurb) setShareBlurb(blurb);
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Share blurb failed");
+    } finally {
+      setGeneratingBlurb(false);
+    }
+  }
+
+  async function handleCopyBlurb() {
+    if (!shareBlurb.trim()) return;
+    try {
+      await navigator.clipboard.writeText(shareBlurb);
+      toast.success("Blurb copied");
+    } catch {
+      toast.error("Could not copy blurb");
+    }
+  }
+
+  async function handleSendEmail() {
+    if (!shareEmail.trim()) {
+      toast.error("Enter a recipient email");
+      return;
+    }
+    if (!freshUrl) {
+      toast.error("Create a share link first, then send while the URL is visible");
+      return;
+    }
+    setSendingEmail(true);
+    const result = await sendDeckShareEmail(deckId, {
+      to: shareEmail,
+      shareUrl: freshUrl,
+      message: shareBlurb,
+    });
+    const actionError = getActionError(result);
+    if (actionError) toast.error(actionError);
+    else toast.success("Email sent");
+    setSendingEmail(false);
+  }
+
   const activeLinks = links.filter((link) => !link.revoked_at);
 
   return (
@@ -134,6 +209,39 @@ export function DeckSharePanel({
             Anyone with the link can view this deck in present mode — no login
             required. New links expire in 30 days.
           </p>
+
+          <div className="space-y-2">
+            <Label htmlFor="share-blurb">Email blurb (optional)</Label>
+            <textarea
+              id="share-blurb"
+              rows={4}
+              value={shareBlurb}
+              onChange={(e) => setShareBlurb(e.target.value)}
+              placeholder="AI can draft a short message to send with your share link."
+              disabled={generatingBlurb}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" size="sm" disabled={generatingBlurb} onClick={() => void handleGenerateBlurb()}>
+                {generatingBlurb ? "Generating…" : "Generate blurb"}
+              </Button>
+              <Button type="button" variant="outline" size="sm" disabled={!shareBlurb.trim()} onClick={() => void handleCopyBlurb()}>
+                Copy blurb
+              </Button>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Input
+                type="email"
+                placeholder="Recipient email"
+                value={shareEmail}
+                onChange={(e) => setShareEmail(e.target.value)}
+                disabled={sendingEmail}
+              />
+              <Button type="button" size="sm" disabled={sendingEmail || !shareEmail.trim()} onClick={() => void handleSendEmail()}>
+                {sendingEmail ? "Sending…" : "Email link"}
+              </Button>
+            </div>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="share-label">Label (optional)</Label>

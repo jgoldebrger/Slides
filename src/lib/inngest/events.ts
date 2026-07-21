@@ -9,7 +9,14 @@ export type DeckEventName =
   | "deck/export"
   | "deck/slide.rewrite"
   | "deck/slide.visual"
-  | "deck/slide.background";
+  | "deck/slide.background"
+  | "deck/speaker-notes.generate"
+  | "deck/qa.run"
+  | "deck/slide.chart-narrative"
+  | "deck/slide.alt-text"
+  | "deck/share-blurb.generate"
+  | "deck/translate"
+  | "deck/narrate";
 
 export async function sendDeckEvent(
   name: DeckEventName,

@@ -4,6 +4,9 @@ export const deckJobEventSchema = z.object({
   deckId: z.string().uuid(),
   userId: z.string().uuid(),
   orgId: z.string().uuid().optional(),
+  revisionReason: z
+    .enum(["refresh", "regenerate", "manual", "audience_variant", "translate"])
+    .optional(),
 });
 
 export const exportJobEventSchema = z.object({
@@ -15,6 +18,7 @@ export const exportJobEventSchema = z.object({
 export const rewriteSlideEventSchema = deckJobEventSchema.extend({
   slideId: z.string().uuid(),
   generationId: z.string().uuid(),
+  instructions: z.string().max(500).optional(),
 });
 
 export const slideVisualEventSchema = z.object({
@@ -39,6 +43,28 @@ export const slideBackgroundEventSchema = z.object({
   instructions: z.string().optional(),
   style: z.string(),
   variationSeed: z.string(),
+});
+
+export const deckAiJobEventSchema = deckJobEventSchema.extend({
+  generationId: z.string().uuid(),
+});
+
+export const speakerNotesEventSchema = deckAiJobEventSchema.extend({
+  slideId: z.string().uuid().optional(),
+  scope: z.enum(["slide", "deck"]),
+});
+
+export const slideAiJobEventSchema = deckAiJobEventSchema.extend({
+  slideId: z.string().uuid(),
+});
+
+export const translateDeckEventSchema = deckAiJobEventSchema.extend({
+  language: z.enum(["es", "fr", "de", "pt", "ja", "zh"]),
+});
+
+export const narrateDeckEventSchema = deckAiJobEventSchema.extend({
+  voice: z.string().optional(),
+  speed: z.number().min(0.25).max(4).optional(),
 });
 
 export function parseEventData<T>(

@@ -12,6 +12,8 @@ import { getSignedStorageUrl, resolveSlideBackgroundUrl, resolveSlideImageUrl } 
 import { EmptyState } from "@/components/shared/state";
 import { requireDeckAccess } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { audienceFromDeckMetadata } from "@/lib/ai/load-deck-audience";
+import type { DeckQaResult } from "@/lib/ai/schemas/deck-ai";
 import { Button } from "@/components/ui/button";
 import { redirectViewerFromDeckEdit } from "@/lib/viewer-guard";
 
@@ -97,6 +99,12 @@ export default async function DeckEditorPage({
     .limit(1)
     .maybeSingle();
 
+  const metadata = (deck.metadata as {
+    shareBlurb?: string;
+    lastQa?: DeckQaResult;
+  }) ?? {};
+  const audience = audienceFromDeckMetadata(deck.metadata);
+
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
@@ -164,6 +172,10 @@ export default async function DeckEditorPage({
           initialShareLinks={shareLinks ?? []}
           initialRevisions={revisions ?? []}
           deckStatus={deck.status}
+          initialAudience={audience}
+          initialQa={metadata.lastQa ?? null}
+          initialShareBlurb={metadata.shareBlurb ?? null}
+          initialAutoRefreshWeekly={metadata.autoRefreshWeekly ?? false}
         />
       )}
     </div>

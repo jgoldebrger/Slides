@@ -13,7 +13,7 @@ import {
   requireDeckAccess,
   getUserOrg,
 } from "@/lib/permissions";
-import { deckOutlineSchema } from "@/lib/validations";
+import { deckOutlineSchema, rewriteInstructionsSchema } from "@/lib/validations";
 import { actionError, toPublicError, PublicError } from "@/lib/errors/public-error";
 import { sendDeckEvent } from "@/lib/inngest/events";
 import type { DeckOutline } from "@/types/slide";
@@ -121,8 +121,18 @@ export async function approveOutline(deckId: string) {
 }
 
 /** Enqueues async rewrite; poll with getAiGenerationStatus / pollAiGeneration. */
-export async function rewriteSlide(slideId: string, deckId: string) {
+export async function rewriteSlide(
+  slideId: string,
+  deckId: string,
+  instructions?: string
+) {
   const { supabase, user, deck } = await requireDeckEdit(deckId);
+
+  const parsedInstructions = rewriteInstructionsSchema.safeParse(instructions);
+  if (!parsedInstructions.success) {
+    return actionError(parsedInstructions.error.issues[0]?.message ?? "Invalid instructions");
+  }
+  const rewriteInstructions = parsedInstructions.data;
 
   const { data: slide } = await supabase
     .from("slides")
@@ -145,7 +155,7 @@ export async function rewriteSlide(slideId: string, deckId: string) {
       .insert({
         deck_id: deckId,
         org_id: deck.org_id,
-        prompt_hash: rewritePromptHash(slideId),
+        prompt_hash: rewritePromptHash(slideId, rewriteInstructions),
         model: "gpt-4o-mini",
         status: "pending",
         created_by: user.id,
@@ -164,6 +174,7 @@ export async function rewriteSlide(slideId: string, deckId: string) {
         userId: user.id,
         orgId: deck.org_id,
         generationId: genLog.id,
+        instructions: rewriteInstructions,
       });
     } catch {
       await supabase

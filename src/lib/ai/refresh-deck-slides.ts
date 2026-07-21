@@ -3,6 +3,7 @@ import { openai } from "@ai-sdk/openai";
 import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadOrgAiTone } from "@/lib/ai/load-org-tone";
+import { loadDeckAudience } from "@/lib/ai/load-deck-audience";
 import { buildSlideFillPrompt } from "@/lib/ai/prompts/slides";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
 import { snapshotDeckSlides } from "@/lib/decks/revisions";
@@ -14,7 +15,11 @@ import type { DeckOutline, DeckType, OutlineSlide } from "@/types/slide";
  * Re-fills existing slides from project updates.
  * Generates all content first, then applies updates in one transaction.
  */
-export async function refreshDeckSlides(deckId: string, userId: string) {
+export async function refreshDeckSlides(
+  deckId: string,
+  userId: string,
+  options?: { revisionReason?: import("@/lib/decks/revisions").RevisionReason }
+) {
   const supabase = createAdminClient();
 
   const { data: deck, error: deckError } = await supabase
@@ -46,7 +51,7 @@ export async function refreshDeckSlides(deckId: string, userId: string) {
     deckId,
     orgId: deck.org_id,
     userId,
-    reason: "refresh",
+    reason: options?.revisionReason ?? "refresh",
   });
 
   const outline = deck.outline as DeckOutline | null;
@@ -64,6 +69,7 @@ export async function refreshDeckSlides(deckId: string, userId: string) {
     .single();
 
   const aiTone = await loadOrgAiTone(supabase, deck.org_id);
+  const audience = await loadDeckAudience(supabase, deckId);
 
   const promptBase = `deck:${deckId}:refresh`;
   const promptHash = createHash("sha256").update(promptBase).digest("hex");
@@ -130,6 +136,7 @@ export async function refreshDeckSlides(deckId: string, userId: string) {
         slideIndex: index,
         totalSlides: existingSlides.length,
         aiTone,
+        audience,
       });
 
       const { object, usage } = await generateObject({

@@ -1,10 +1,12 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
 import { refreshSlidesFromUpdates } from "@/lib/actions/decks";
+import { getLatestRefreshDiff } from "@/lib/actions/refresh-diff";
+import type { RefreshDiff } from "@/lib/slides/refresh-diff";
 import type { BrandPreviewTheme } from "@/lib/brand";
 import { SlideEditorPanel } from "@/components/slides/slide-editor-panel";
 import { SlideList } from "@/components/slides/slide-list";
@@ -12,12 +14,17 @@ import { SlidePreview } from "@/components/slides/slide-preview";
 import { ImageAnnotatorModal } from "@/components/slides/image-annotator-modal";
 import { DeckRevisionPanel, type RevisionRow } from "@/components/decks/deck-revision-panel";
 import { DeckSharePanel, type ShareLinkRow } from "@/components/decks/deck-share-panel";
+import { DeckAiPanel } from "@/components/decks/deck-ai-panel";
+import { DeckChatPanel } from "@/components/decks/deck-chat-panel";
+import { RefreshDiffPanel } from "@/components/decks/refresh-diff-panel";
 import {
   addSlide,
   deleteSlide,
   reorderSlides,
 } from "@/lib/actions/slides";
 import type { Slide } from "@/types/slide";
+import type { DeckAudience } from "@/lib/ai/audience";
+import type { DeckQaResult } from "@/lib/ai/schemas/deck-ai";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -38,6 +45,10 @@ type SlideEditorProps = {
   initialShareLinks?: ShareLinkRow[];
   initialRevisions?: RevisionRow[];
   deckStatus?: string;
+  initialAudience?: DeckAudience;
+  initialQa?: DeckQaResult | null;
+  initialAutoRefreshWeekly?: boolean;
+  initialShareBlurb?: string | null;
 };
 
 export function SlideEditor({
@@ -49,6 +60,10 @@ export function SlideEditor({
   initialShareLinks = [],
   initialRevisions = [],
   deckStatus = "ready",
+  initialAudience = "general",
+  initialQa = null,
+  initialAutoRefreshWeekly = false,
+  initialShareBlurb = null,
 }: SlideEditorProps) {
   const router = useRouter();
   const [slides, setSlides] = useState<Slide[]>(initialSlides);
@@ -59,14 +74,47 @@ export function SlideEditor({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [annotatorOpen, setAnnotatorOpen] = useState(false);
+  const [refreshDiff, setRefreshDiff] = useState<RefreshDiff | null>(null);
+  const [pendingRefreshDiff, setPendingRefreshDiff] = useState(false);
+  const prevStatusRef = useRef(deckStatus);
 
   const selectedSlide = slides.find((s) => s.id === selectedId) ?? null;
 
   const isGenerating = deckStatus === "generating";
 
+  const changedSlideIds = new Set(
+    refreshDiff?.slides.filter((s) => s.changed && s.slideId).map((s) => s.slideId) ??
+      []
+  );
+
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    prevStatusRef.current = deckStatus;
+
+    if (
+      prev === "generating" &&
+      deckStatus === "ready" &&
+      pendingRefreshDiff
+    ) {
+      void (async () => {
+        const result = await getLatestRefreshDiff(deckId);
+        const actionError = getActionError(result);
+        if (!actionError && "diff" in result && result.diff) {
+          setRefreshDiff(result.diff);
+        }
+        setPendingRefreshDiff(false);
+      })();
+    }
+  }, [deckId, deckStatus, pendingRefreshDiff]);
+
+  useEffect(() => {
+    setSlides(initialSlides);
+  }, [initialSlides]);
+
   const handleRefreshFromUpdates = useCallback(async () => {
     if (isGenerating) return;
     setRefreshing(true);
+    setPendingRefreshDiff(true);
     const result = await refreshSlidesFromUpdates(deckId);
     const actionError = getActionError(result);
     if (actionError) {
@@ -159,7 +207,14 @@ export function SlideEditor({
   );
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[240px_1fr_300px]">
+    <div className="space-y-4">
+      <RefreshDiffPanel
+        diff={refreshDiff}
+        onSelectSlide={setSelectedId}
+        onDismiss={() => setRefreshDiff(null)}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[240px_1fr_300px]">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-medium">Slides</h2>
@@ -189,6 +244,7 @@ export function SlideEditor({
             selectedId={selectedId}
             onSelect={setSelectedId}
             onReorder={handleReorder}
+            changedSlideIds={changedSlideIds}
           />
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -222,7 +278,22 @@ export function SlideEditor({
           </Dialog>
         )}
 
-        <DeckSharePanel deckId={deckId} initialLinks={initialShareLinks} />
+        <DeckSharePanel
+          deckId={deckId}
+          initialLinks={initialShareLinks}
+          initialBlurb={initialShareBlurb}
+        />
+        <DeckAiPanel
+          deckId={deckId}
+          initialAudience={initialAudience}
+          initialQa={initialQa}
+          initialAutoRefreshWeekly={initialAutoRefreshWeekly}
+        />
+        <DeckChatPanel
+          deckId={deckId}
+          onSelectSlide={setSelectedId}
+          onActionsComplete={() => router.refresh()}
+        />
         <DeckRevisionPanel
           deckId={deckId}
           initialRevisions={initialRevisions}
@@ -283,6 +354,7 @@ export function SlideEditor({
           </div>
         )}
       </div>
+    </div>
     </div>
   );
 }

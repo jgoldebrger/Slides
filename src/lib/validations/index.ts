@@ -112,3 +112,13 @@ export const teamMemberUpdateSchema = z.object({
 export type TeamMemberInviteInput = z.infer<typeof teamMemberInviteSchema>;
 export type TeamMemberCreateInput = TeamMemberInviteInput;
 export type TeamMemberUpdateInput = z.infer<typeof teamMemberUpdateSchema>;
+
+/** Optional user direction for per-slide AI rewrite (instructed rewrite). */
+export const rewriteInstructionsSchema = z
+  .string()
+  .max(500, "Instructions must be 500 characters or fewer")
+  .optional()
+  .transform((value) => {
+    const trimmed = value?.trim();
+    return trimmed ? trimmed : undefined;
+  });

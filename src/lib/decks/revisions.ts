@@ -1,6 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type RevisionReason = "refresh" | "regenerate" | "manual";
+export type RevisionReason =
+  | "refresh"
+  | "regenerate"
+  | "manual"
+  | "audience_variant"
+  | "translate";
 
 const MAX_REVISIONS_PER_DECK = 20;
 

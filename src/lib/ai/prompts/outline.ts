@@ -1,6 +1,7 @@
 import type { DeckOutline, DeckType } from "@/types/slide";
 import { DECK_TYPE_LABELS } from "@/lib/deck-labels";
 import { aiTonePromptHint, type AiTone } from "@/lib/ai/tone";
+import { audiencePromptHint, type DeckAudience } from "@/lib/ai/audience";
 
 export function buildOutlinePrompt({
   deckType,
@@ -10,6 +11,8 @@ export function buildOutlinePrompt({
   existingOutline,
   existingSlideCount,
   aiTone = "executive",
+  audience = "general",
+  orgStyleHint,
 }: {
   deckType: DeckType;
   projectName: string;
@@ -18,6 +21,8 @@ export function buildOutlinePrompt({
   existingOutline?: DeckOutline | null;
   existingSlideCount?: number;
   aiTone?: AiTone;
+  audience?: DeckAudience;
+  orgStyleHint?: string;
 }) {
   const preserveStructure =
     existingOutline?.slides?.length &&
@@ -45,6 +50,13 @@ Create a slide outline for a "${DECK_TYPE_LABELS[deckType]}" deck.
 
 Voice / tone:
 - ${aiTonePromptHint(aiTone)}
+
+Target audience:
+- ${audiencePromptHint(audience)}
+${orgStyleHint ? `\nOrganization style (from past decks):\n- ${orgStyleHint}` : ""}
+
+Layout guidance:
+- Prefer title for cover, section_break between major sections, metrics_grid for KPIs, chart for trends, timeline for milestones, bullets for narrative.
 
 Rules:
 - Use ONLY facts from the project data below. Do not invent metrics, dates, or achievements.

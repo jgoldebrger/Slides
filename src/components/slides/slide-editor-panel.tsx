@@ -5,6 +5,11 @@ import { Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
 import { rewriteSlide } from "@/lib/actions/decks";
+import {
+  generateAltText,
+  generateChartNarrative,
+  generateSpeakerNotes,
+} from "@/lib/actions/ai-enhancements";
 import { updateSlide } from "@/lib/actions/slides";
 import { SLIDE_LAYOUTS } from "@/types/slide";
 import type { Slide, SlideContent, SlideLayout } from "@/types/slide";
@@ -24,6 +29,25 @@ import {
   AUTOSAVE_DEBOUNCE_MS,
   useDebouncedEffect,
 } from "@/lib/hooks/use-debounce";
+
+const REWRITE_PRESETS = [
+  {
+    label: "Shorter",
+    text: "Make this shorter and more concise.",
+  },
+  {
+    label: "More metrics",
+    text: "Add more metrics and quantitative data where available.",
+  },
+  {
+    label: "Less jargon",
+    text: "Use plain language; reduce jargon and acronyms.",
+  },
+  {
+    label: "Board audience",
+    text: "Rewrite for a board audience — high-level, risk-aware, outcome-focused.",
+  },
+] as const;
 
 type SlideEditorPanelProps = {
   slide: Slide;
@@ -84,8 +108,12 @@ export function SlideEditorPanel({
     slide.content.attribution ?? ""
   );
   const [speakerNotes, setSpeakerNotes] = useState(slide.speakerNotes ?? "");
+  const [rewriteInstructions, setRewriteInstructions] = useState("");
   const [saving, setSaving] = useState(false);
   const [rewriting, setRewriting] = useState(false);
+  const [generatingNotes, setGeneratingNotes] = useState(false);
+  const [generatingChart, setGeneratingChart] = useState(false);
+  const [generatingAltText, setGeneratingAltText] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   const slideRef = useRef(slide);
@@ -207,7 +235,11 @@ export function SlideEditorPanel({
     setRewriting(true);
 
     try {
-      const result = await rewriteSlide(slide.id, deckId);
+      const result = await rewriteSlide(
+        slide.id,
+        deckId,
+        rewriteInstructions.trim() || undefined
+      );
       const actionError = getActionError(result);
       if (actionError) {
         toast.error(actionError);
@@ -253,6 +285,116 @@ export function SlideEditorPanel({
       toast.error(err instanceof Error ? err.message : "Rewrite failed");
     } finally {
       setRewriting(false);
+    }
+  }
+
+  async function handleGenerateNotes() {
+    setGeneratingNotes(true);
+    try {
+      const result = await generateSpeakerNotes(deckId, { slideId: slide.id });
+      const actionError = getActionError(result);
+      if (actionError) {
+        toast.error(actionError);
+        return;
+      }
+      if (!("generationId" in result) || !result.generationId) {
+        toast.error("Failed to start speaker notes");
+        return;
+      }
+      toast.message("Generating speaker notes…");
+      const { pollAiGeneration } = await import(
+        "@/lib/hooks/poll-ai-generation"
+      );
+      const done = await pollAiGeneration(deckId, result.generationId);
+      const notesResult = done.result as {
+        slides?: Array<{ slideId: string; speakerNotes: string }>;
+      } | null;
+      const slideNotes = notesResult?.slides?.find((s) => s.slideId === slide.id);
+      if (slideNotes?.speakerNotes) {
+        setSpeakerNotes(slideNotes.speakerNotes);
+        const updated = { ...slideRef.current, speakerNotes: slideNotes.speakerNotes };
+        slideRef.current = updated;
+        onUpdate(updated);
+      }
+      toast.success("Speaker notes generated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Speaker notes failed");
+    } finally {
+      setGeneratingNotes(false);
+    }
+  }
+
+  async function handleChartNarrative() {
+    setGeneratingChart(true);
+    try {
+      const result = await generateChartNarrative(deckId, slide.id);
+      const actionError = getActionError(result);
+      if (actionError) {
+        toast.error(actionError);
+        return;
+      }
+      if (!("generationId" in result) || !result.generationId) {
+        toast.error("Failed to start chart narrative");
+        return;
+      }
+      toast.message("Generating chart narrative…");
+      const { pollAiGeneration } = await import(
+        "@/lib/hooks/poll-ai-generation"
+      );
+      const done = await pollAiGeneration(deckId, result.generationId);
+      const chartResult = done.result as {
+        content?: Slide["content"];
+        title?: string;
+      } | null;
+      if (chartResult?.content) {
+        applyContentToFields(chartResult.content);
+        const updated = {
+          ...slideRef.current,
+          content: chartResult.content,
+        };
+        slideRef.current = updated;
+        onUpdate(updated);
+      }
+      toast.success("Chart narrative updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Chart narrative failed");
+    } finally {
+      setGeneratingChart(false);
+    }
+  }
+
+  async function handleGenerateAltText() {
+    setGeneratingAltText(true);
+    try {
+      const result = await generateAltText(deckId, slide.id);
+      const actionError = getActionError(result);
+      if (actionError) {
+        toast.error(actionError);
+        return;
+      }
+      if (!("generationId" in result) || !result.generationId) {
+        toast.error("Failed to start alt text generation");
+        return;
+      }
+      toast.message("Generating alt text…");
+      const { pollAiGeneration } = await import(
+        "@/lib/hooks/poll-ai-generation"
+      );
+      const done = await pollAiGeneration(deckId, result.generationId);
+      const altResult = done.result as {
+        imageAlt?: string;
+        content?: Slide["content"];
+      } | null;
+      if (altResult?.content) {
+        const updated = { ...slideRef.current, content: altResult.content };
+        slideRef.current = updated;
+        onUpdate(updated);
+      }
+      toast.success(altResult?.imageAlt ? "Alt text generated" : "Alt text updated");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Alt text failed");
+    } finally {
+      setGeneratingAltText(false);
     }
   }
 
@@ -385,11 +527,20 @@ export function SlideEditorPanel({
           )}
 
           {slots.includes("chartData") && (
-            <p className="text-xs text-muted-foreground">
-              Chart data comes from metrics when available. Switch to metrics
-              grid to edit values, or use Rewrite with AI to regenerate the
-              chart.
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Chart data comes from metrics when available.
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={generatingChart}
+                onClick={() => void handleChartNarrative()}
+              >
+                {generatingChart ? "Generating…" : "Generate chart narrative"}
+              </Button>
+            </div>
           )}
 
           <SlideVisualUpload
@@ -404,6 +555,47 @@ export function SlideEditorPanel({
               onUpdate(updated);
             }}
           />
+
+          {(slideRef.current.content.imagePath ||
+            slideRef.current.content.imageUrl) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={generatingAltText}
+              onClick={() => void handleGenerateAltText()}
+            >
+              {generatingAltText ? "Generating…" : "Generate alt text"}
+            </Button>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="rewrite-instructions">Rewrite instructions (optional)</Label>
+            <textarea
+              id="rewrite-instructions"
+              rows={2}
+              value={rewriteInstructions}
+              onChange={(e) => setRewriteInstructions(e.target.value)}
+              placeholder="e.g. shorter, more metrics, less jargon, audience: board"
+              disabled={rewriting}
+              maxLength={500}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <div className="flex flex-wrap gap-2">
+              {REWRITE_PRESETS.map((preset) => (
+                <Button
+                  key={preset.label}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={rewriting}
+                  onClick={() => setRewriteInstructions(preset.text)}
+                >
+                  {preset.label}
+                </Button>
+              ))}
+            </div>
+          </div>
 
           <Button
             type="button"
@@ -450,6 +642,15 @@ export function SlideEditorPanel({
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={generatingNotes}
+            onClick={() => void handleGenerateNotes()}
+          >
+            {generatingNotes ? "Generating…" : "Generate talking points"}
+          </Button>
           <p className="text-xs text-muted-foreground">
             Speaker notes appear in export and narration during playback.
           </p>

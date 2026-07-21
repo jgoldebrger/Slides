@@ -210,6 +210,23 @@ export async function runSlideVisualJob({
       .update({ status: "completed", result })
       .eq("id", generationId);
 
+    const { data: gen } = await supabase
+      .from("ai_generations")
+      .select("created_by")
+      .eq("id", generationId)
+      .single();
+
+    if (gen?.created_by) {
+      const { enqueueAutoAltText } = await import("@/lib/ai/run-narrate-deck");
+      await enqueueAutoAltText({
+        supabase,
+        deckId,
+        slideId,
+        orgId: deck.org_id,
+        userId: gen.created_by,
+      });
+    }
+
     return result;
   } catch (err) {
     const message =
