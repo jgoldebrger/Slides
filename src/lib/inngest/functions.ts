@@ -181,6 +181,7 @@ export const slideVisualJob = inngest.createFunction(
           visualStyle: data.visualStyle as VisualStyle | undefined,
           sourcePath: data.sourcePath,
           sourceMimeType: data.sourceMimeType,
+          keepAnnotations: data.keepAnnotations,
         })
       );
     } catch (err) {

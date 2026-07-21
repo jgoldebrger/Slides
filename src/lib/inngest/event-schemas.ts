@@ -22,11 +22,12 @@ export const slideVisualEventSchema = z.object({
   slideId: z.string().uuid(),
   generationId: z.string().uuid(),
   orgId: z.string().uuid().optional(),
-  mode: z.enum(["create", "refine"]),
+  mode: z.enum(["create", "refine", "annotate_polish"]),
   instructions: z.string().optional(),
   visualStyle: z.string().optional(),
   sourcePath: z.string().optional(),
   sourceMimeType: z.string().optional(),
+  keepAnnotations: z.boolean().optional(),
 });
 
 export const slideBackgroundEventSchema = z.object({

@@ -16,6 +16,7 @@ type SlidePreviewProps = {
   applyBranding?: boolean;
   brandTheme?: BrandPreviewTheme | null;
   deckBackgroundUrl?: string | null;
+  onImageClick?: () => void;
 };
 
 type SlideColors = {
@@ -31,12 +32,14 @@ function PreviewSlideImage({
   title,
   className,
   maxHeight = "max-h-40",
+  onClick,
 }: {
   imageUrl?: string;
   imageAlt?: string;
   title: string;
   className?: string;
   maxHeight?: string;
+  onClick?: () => void;
 }) {
   if (!imageUrl) return null;
   return (
@@ -44,7 +47,26 @@ function PreviewSlideImage({
     <img
       src={imageUrl}
       alt={imageAlt ?? title}
-      className={cn("max-w-full object-contain", maxHeight, className)}
+      className={cn(
+        "max-w-full object-contain",
+        maxHeight,
+        onClick && "cursor-pointer transition-opacity hover:opacity-90",
+        className
+      )}
+      onClick={onClick}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            }
+          : undefined
+      }
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      title={onClick ? "Click to annotate" : undefined}
     />
   );
 }
@@ -77,6 +99,7 @@ export function SlidePreview({
   applyBranding = false,
   brandTheme = null,
   deckBackgroundUrl = null,
+  onImageClick,
 }: SlidePreviewProps) {
   const { layout, title, content } = slide;
   const colors = resolveSlideColors(applyBranding, brandTheme);
@@ -125,6 +148,7 @@ export function SlidePreview({
         content={content}
         colors={colors}
         logoUrl={applyBranding ? brandTheme?.logoUrl : null}
+        onImageClick={onImageClick}
       />
       </div>
     </div>
@@ -137,12 +161,14 @@ function SlideLayoutContent({
   content,
   colors,
   logoUrl,
+  onImageClick,
 }: {
   layout: SlideLayout;
   title: string;
   content: Slide["content"];
   colors: SlideColors;
   logoUrl?: string | null;
+  onImageClick?: () => void;
 }) {
   const titleStyle = { color: colors.primary };
   const accentStyle = { color: colors.accent };
@@ -208,6 +234,7 @@ function SlideLayoutContent({
                   title={title}
                   maxHeight="max-h-full"
                   className="h-full"
+                  onClick={onImageClick}
                 />
               </div>
             </div>
@@ -325,6 +352,7 @@ function SlideLayoutContent({
                     imageAlt={content.imageAlt}
                     title={title}
                     maxHeight="max-h-full"
+                    onClick={onImageClick}
                   />
                 </div>
                 {right.length > 0 && (
@@ -382,6 +410,7 @@ function SlideLayoutContent({
                   imageAlt={content.imageAlt}
                   title={title}
                   maxHeight="max-h-full"
+                  onClick={onImageClick}
                 />
               ) : (
                 <span className="text-sm opacity-50">Image placeholder</span>

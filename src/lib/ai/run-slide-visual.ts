@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import {
+  buildVisualPromptFromAnnotatedUpload,
   buildVisualPromptFromSlide,
   buildVisualPromptFromUpload,
   generateSlideImage,
@@ -50,15 +51,17 @@ export async function runSlideVisualJob({
   visualStyle,
   sourcePath,
   sourceMimeType,
+  keepAnnotations,
 }: {
   deckId: string;
   slideId: string;
   generationId: string;
-  mode: "create" | "refine";
+  mode: "create" | "refine" | "annotate_polish";
   instructions?: string;
   visualStyle?: VisualStyle;
   sourcePath?: string;
   sourceMimeType?: string;
+  keepAnnotations?: boolean;
 }) {
   const supabase = createAdminClient();
 
@@ -95,7 +98,7 @@ export async function runSlideVisualJob({
     const outputPath = `${deck.org_id}/${deckId}/${slideId}/visual-${crypto.randomUUID()}.png`;
 
     let dallePrompt: string;
-    if (mode === "refine") {
+    if (mode === "refine" || mode === "annotate_polish") {
       if (!sourcePath) throw new Error("Source image required for refine");
       const { data: fileData, error: downloadError } = await supabase.storage
         .from("slide-assets")
@@ -104,13 +107,25 @@ export async function runSlideVisualJob({
         throw new Error(downloadError?.message ?? "Failed to load source image");
       }
       const buffer = Buffer.from(await fileData.arrayBuffer());
-      dallePrompt = await buildVisualPromptFromUpload({
-        imageBytes: new Uint8Array(buffer),
-        mimeType: sourceMimeType ?? "image/png",
-        slideTitle: slide.title,
-        slideContext,
-        userInstructions: instructions,
-      });
+      if (mode === "annotate_polish") {
+        dallePrompt = await buildVisualPromptFromAnnotatedUpload({
+          imageBytes: new Uint8Array(buffer),
+          mimeType: sourceMimeType ?? "image/png",
+          slideTitle: slide.title,
+          slideContext,
+          userInstructions: instructions,
+          keepAnnotations: keepAnnotations ?? false,
+          brandColors,
+        });
+      } else {
+        dallePrompt = await buildVisualPromptFromUpload({
+          imageBytes: new Uint8Array(buffer),
+          mimeType: sourceMimeType ?? "image/png",
+          slideTitle: slide.title,
+          slideContext,
+          userInstructions: instructions,
+        });
+      }
     } else {
       dallePrompt = await buildVisualPromptFromSlide({
         slideTitle: slide.title,
@@ -139,9 +154,13 @@ export async function runSlideVisualJob({
       alt: slide.title,
       caption:
         instructions ??
-        (mode === "refine"
-          ? "AI-refined visual"
-          : `AI-generated ${visualStyle ?? "illustration"} visual`),
+        (mode === "annotate_polish"
+          ? keepAnnotations
+            ? "AI-polished annotated visual"
+            : "AI-polished visual"
+          : mode === "refine"
+            ? "AI-refined visual"
+            : `AI-generated ${visualStyle ?? "illustration"} visual`),
     });
 
     const updatedContent: Record<string, unknown> = {

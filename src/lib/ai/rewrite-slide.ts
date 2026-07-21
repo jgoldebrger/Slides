@@ -59,11 +59,27 @@ export async function runRewriteSlide({
       }),
     });
 
+    const slideContent = (slide.content as Record<string, unknown>) ?? {};
+    const preservedVisualFields = {
+      imagePath: slideContent.imagePath,
+      imageAlt: slideContent.imageAlt,
+      sourceImagePath: slideContent.sourceImagePath,
+      backgroundImagePath: slideContent.backgroundImagePath,
+      backgroundImageUrl: slideContent.backgroundImageUrl,
+    };
+
+    const mergedContent = {
+      ...object.content,
+      ...Object.fromEntries(
+        Object.entries(preservedVisualFields).filter(([, v]) => v != null)
+      ),
+    };
+
     const { error } = await supabase
       .from("slides")
       .update({
         title: object.title,
-        content: object.content,
+        content: mergedContent,
         speaker_notes: object.speakerNotes ?? slide.speaker_notes,
         updated_at: new Date().toISOString(),
       })
@@ -74,7 +90,7 @@ export async function runRewriteSlide({
     const result = {
       slideId,
       title: object.title,
-      content: object.content as Slide["content"],
+      content: mergedContent as Slide["content"],
       speakerNotes: object.speakerNotes ?? slide.speaker_notes,
     };
 

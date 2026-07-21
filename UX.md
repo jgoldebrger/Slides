@@ -18,7 +18,7 @@ Select project → fill structured form (goals, progress, metrics, risks, blocke
 Choose deck type → AI generates outline → user reviews/edits outline → approve → slides generate
 
 ### 4. Edit deck
-Slide list with DnD reorder → click slide to edit title, content, notes → autosave
+Slide list with DnD reorder → click slide to edit title, content, notes → autosave. Slide images: upload as-is, annotate (pen, highlight, shapes, crop, blur), then apply or **Polish with AI** (clean rebuild or keep annotations).
 
 ### 5. Export
 Click export → background job → notification/download when ready
@@ -39,6 +39,7 @@ Click export → background job → notification/download when ready
 | Approve outline | Status badge changes to `approved` |
 | Generate slides | Full-page or modal progress; poll or realtime |
 | Export | Toast + download link when `completed` |
+| Annotate image | Modal with tools; Apply saves flat PNG; Polish enqueues AI job |
 | Error | Inline message + retry option |
 
 ## Accessibility

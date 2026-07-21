@@ -34,6 +34,7 @@ type SlideEditorPanelProps = {
     backgroundImagePath?: string;
     backgroundImageUrl?: string | null;
   }) => void;
+  onAnnotateImage?: () => void;
 };
 
 function buildContentFromFields({
@@ -67,6 +68,7 @@ export function SlideEditorPanel({
   slideCount,
   onUpdate,
   onBackgroundAppliedToAll,
+  onAnnotateImage,
 }: SlideEditorPanelProps) {
   const [title, setTitle] = useState(slide.title);
   const [layout, setLayout] = useState<SlideLayout>(slide.layout);
@@ -393,6 +395,7 @@ export function SlideEditorPanel({
           <SlideVisualUpload
             slide={slideRef.current}
             deckId={deckId}
+            onAnnotateImage={onAnnotateImage}
             onVisualReady={(updated) => {
               setLayout(updated.layout);
               layoutRef.current = updated.layout;

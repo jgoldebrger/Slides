@@ -35,6 +35,8 @@ export interface SlideContent {
   body?: string;
   imageUrl?: string;
   imagePath?: string;
+  /** Original upload before AI refine or annotate polish */
+  sourceImagePath?: string;
   imageAlt?: string;
   backgroundImageUrl?: string;
   backgroundImagePath?: string;

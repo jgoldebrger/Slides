@@ -1,10 +1,14 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { ImagePlus, Wand2 } from "lucide-react";
+import { ImagePlus, Pencil, Upload, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
-import { createSlideVisual, finishSlideVisual } from "@/lib/actions/visuals";
+import {
+  attachSlideVisual,
+  createSlideVisual,
+  finishSlideVisual,
+} from "@/lib/actions/visuals";
 import { VISUAL_STYLES } from "@/lib/ai/visuals";
 import type { Slide } from "@/types/slide";
 import { Button } from "@/components/ui/button";
@@ -16,14 +20,17 @@ type SlideVisualUploadProps = {
   slide: Slide;
   deckId: string;
   onVisualReady: (slide: Slide) => void;
+  onAnnotateImage?: () => void;
 };
 
 export function SlideVisualUpload({
   slide,
   deckId,
   onVisualReady,
+  onAnnotateImage,
 }: SlideVisualUploadProps) {
   const refineFormRef = useRef<HTMLFormElement>(null);
+  const attachFormRef = useRef<HTMLFormElement>(null);
   const [generating, setGenerating] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(slide.content.imageUrl);
   const [visualStyle, setVisualStyle] = useState("illustration");
@@ -120,36 +127,78 @@ export function SlideVisualUpload({
     }
   }
 
+  async function handleAttach(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setGenerating(true);
+
+    try {
+      const formData = new FormData(e.currentTarget);
+      const result = await attachSlideVisual(deckId, slide.id, formData);
+      const actionError = getActionError(result);
+      if (actionError) {
+        toast.error(actionError);
+        return;
+      }
+      if (!("imagePath" in result)) return;
+      toast.success("Image attached to slide");
+      applyResult(result);
+      attachFormRef.current?.reset();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   return (
     <div className="space-y-3 rounded-lg border border-border bg-muted/40 p-4">
       <div>
         <h4 className="text-sm font-medium">AI visuals</h4>
         <p className="mt-1 text-xs text-muted-foreground">
-          Generate an image or refine an upload. Your slide text is kept — image
-          appears beside bullets or body text.
+          Generate, upload, annotate, or refine slide images. Text on the slide
+          is kept — images appear beside bullets or body text.
         </p>
       </div>
 
       {previewUrl && (
-        <div className="overflow-hidden rounded-md border border-border bg-card">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={previewUrl}
-            alt={slide.content.imageAlt ?? slide.title}
-            className="max-h-36 w-full object-contain"
-          />
+        <div className="space-y-2">
+          <div className="overflow-hidden rounded-md border border-border bg-card">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={previewUrl}
+              alt={slide.content.imageAlt ?? slide.title}
+              className="max-h-36 w-full object-contain"
+            />
+          </div>
+          {onAnnotateImage && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5"
+              onClick={onAnnotateImage}
+              disabled={generating}
+            >
+              <Pencil className="h-3.5 w-3.5" />
+              Annotate image
+            </Button>
+          )}
         </div>
       )}
 
       <Tabs defaultValue="create">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="create" className="gap-1.5 text-xs">
             <ImagePlus className="h-3.5 w-3.5" />
             Create
           </TabsTrigger>
+          <TabsTrigger value="upload" className="gap-1.5 text-xs">
+            <Upload className="h-3.5 w-3.5" />
+            Upload
+          </TabsTrigger>
           <TabsTrigger value="refine" className="gap-1.5 text-xs">
             <Wand2 className="h-3.5 w-3.5" />
-            Refine upload
+            Refine
           </TabsTrigger>
         </TabsList>
 
@@ -182,6 +231,32 @@ export function SlideVisualUpload({
             </div>
             <Button type="submit" disabled={generating} className="w-full">
               {generating ? "Creating image…" : "Generate image"}
+            </Button>
+          </form>
+        </TabsContent>
+
+        <TabsContent value="upload">
+          <form
+            ref={attachFormRef}
+            onSubmit={handleAttach}
+            className="space-y-3 pt-2"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="attach-file">Use image as-is</Label>
+              <Input
+                id="attach-file"
+                name="file"
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                required
+                disabled={generating}
+              />
+              <p className="text-xs text-muted-foreground">
+                Attach a screenshot or photo without AI. Annotate it afterward.
+              </p>
+            </div>
+            <Button type="submit" disabled={generating} className="w-full">
+              {generating ? "Uploading…" : "Attach to slide"}
             </Button>
           </form>
         </TabsContent>

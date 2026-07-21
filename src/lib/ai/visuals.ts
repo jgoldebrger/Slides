@@ -2,6 +2,7 @@ import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import {
   buildBackgroundMetaPrompt,
+  buildAnnotatePolishMetaPrompt,
   buildRefineVisualMetaPrompt,
   buildVisualPromptMetaPrompt,
 } from "@/lib/ai/prompts/visuals";
@@ -193,6 +194,52 @@ export async function buildVisualPromptFromUpload({
               slideTitle,
               slideContext,
               userInstructions,
+            }),
+          },
+        ],
+      },
+    ],
+  });
+
+  return text.trim().slice(0, 900);
+}
+
+export async function buildVisualPromptFromAnnotatedUpload({
+  imageBytes,
+  mimeType,
+  slideTitle,
+  slideContext,
+  userInstructions,
+  keepAnnotations,
+  brandColors,
+}: {
+  imageBytes: Uint8Array;
+  mimeType: string;
+  slideTitle: string;
+  slideContext: string;
+  userInstructions?: string;
+  keepAnnotations: boolean;
+  brandColors?: { primary: string; accent: string };
+}): Promise<string> {
+  const { text } = await generateText({
+    model: openai("gpt-4o-mini"),
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "file",
+            mediaType: mimeType,
+            data: imageBytes,
+          },
+          {
+            type: "text",
+            text: buildAnnotatePolishMetaPrompt({
+              slideTitle,
+              slideContext,
+              userInstructions,
+              keepAnnotations,
+              brandColors,
             }),
           },
         ],

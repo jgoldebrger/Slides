@@ -120,3 +120,40 @@ User instructions: ${userInstructions || "Polish this into a presentation-ready 
 
 Return ONLY the image generation prompt (max 900 characters). No quotes or explanation.`;
 }
+
+export function buildAnnotatePolishMetaPrompt({
+  slideTitle,
+  slideContext,
+  userInstructions,
+  keepAnnotations,
+  brandColors,
+}: {
+  slideTitle: string;
+  slideContext: string;
+  userInstructions?: string;
+  keepAnnotations: boolean;
+  brandColors?: { primary: string; accent: string };
+}) {
+  const brandLine = brandColors
+    ? `Use brand colors: primary ${brandColors.primary}, accent ${brandColors.accent}.`
+    : "Use a professional blue and neutral corporate palette.";
+
+  const annotationRule = keepAnnotations
+    ? `The upload includes user markup (highlights, arrows, boxes, blur regions, labels). Preserve that markup EXACTLY in the output — same positions, colors, and shapes. Only improve overall clarity, lighting, and presentation quality beneath/around the marks.`
+    : `The upload includes editor markup (highlights, arrows, boxes, labels) that indicates what to emphasize. Use those marks as GUIDANCE ONLY — do NOT reproduce pen strokes, highlighter, arrows, or annotation boxes in the final image. Produce a clean, presentation-ready visual that reflects the emphasized areas and content.`;
+
+  return `You are a presentation designer. The user annotated a slide image and wants it polished for an executive project-update deck.
+
+Create ONE image generation prompt for a polished, professional 16:9 presentation slide visual that:
+- ${annotationRule}
+- ${brandLine}
+- Preserves factual content, labels, and data from the underlying image
+- High contrast, readable text if any, no watermarks or fake logos
+- Does not invent metrics or dates not present in the source
+
+Slide title: ${slideTitle}
+Slide context: ${slideContext || "N/A"}
+User instructions: ${userInstructions || "Polish into a presentation-ready visual"}
+
+Return ONLY the image generation prompt (max 900 characters). No quotes or explanation.`;
+}

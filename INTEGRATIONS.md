@@ -20,6 +20,8 @@
 
 **TTS (player AI reader):** OpenAI `tts-1` via `POST /api/decks/[id]/narrate`. Voices: alloy, echo, fable, onyx, nova, shimmer. Audio is cached under `slide-assets/{org}/{deck}/tts/`.
 
+**Slide visuals (create / refine / annotate polish):** OpenAI `gpt-image-1` via Inngest `deck/slide.visual`. Annotate polish accepts a marked-up PNG from the editor; `keepAnnotations` controls whether markup is preserved in the output.
+
 ## Inngest
 
 **Purpose:** Background jobs (AI generation, PPTX export, email)

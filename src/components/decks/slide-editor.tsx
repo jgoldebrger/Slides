@@ -9,6 +9,7 @@ import type { BrandPreviewTheme } from "@/lib/brand";
 import { SlideEditorPanel } from "@/components/slides/slide-editor-panel";
 import { SlideList } from "@/components/slides/slide-list";
 import { SlidePreview } from "@/components/slides/slide-preview";
+import { ImageAnnotatorModal } from "@/components/slides/image-annotator-modal";
 import { DeckRevisionPanel, type RevisionRow } from "@/components/decks/deck-revision-panel";
 import { DeckSharePanel, type ShareLinkRow } from "@/components/decks/deck-share-panel";
 import {
@@ -57,6 +58,7 @@ export function SlideEditor({
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [annotatorOpen, setAnnotatorOpen] = useState(false);
 
   const selectedSlide = slides.find((s) => s.id === selectedId) ?? null;
 
@@ -229,13 +231,30 @@ export function SlideEditor({
 
       <div>
         {selectedSlide ? (
-          <SlidePreview
-            key={selectedSlide.id}
-            slide={selectedSlide}
-            applyBranding={applyBranding}
-            brandTheme={brandTheme}
-            deckBackgroundUrl={deckBackgroundUrl}
-          />
+          <>
+            <SlidePreview
+              key={selectedSlide.id}
+              slide={selectedSlide}
+              applyBranding={applyBranding}
+              brandTheme={brandTheme}
+              deckBackgroundUrl={deckBackgroundUrl}
+              onImageClick={
+                selectedSlide.content.imageUrl
+                  ? () => setAnnotatorOpen(true)
+                  : undefined
+              }
+            />
+            {selectedSlide.content.imageUrl && (
+              <ImageAnnotatorModal
+                open={annotatorOpen}
+                onOpenChange={setAnnotatorOpen}
+                imageUrl={selectedSlide.content.imageUrl}
+                deckId={deckId}
+                slide={selectedSlide}
+                onComplete={onSlideUpdate}
+              />
+            )}
+          </>
         ) : (
           <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-border bg-muted text-sm text-muted-foreground">
             Select a slide to preview
@@ -252,6 +271,11 @@ export function SlideEditor({
             slideCount={slides.length}
             onUpdate={onSlideUpdate}
             onBackgroundAppliedToAll={onBackgroundAppliedToAll}
+            onAnnotateImage={
+              selectedSlide.content.imageUrl
+                ? () => setAnnotatorOpen(true)
+                : undefined
+            }
           />
         ) : (
           <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
