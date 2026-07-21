@@ -11,6 +11,7 @@ import {
   AI_TONES,
   type AiTone,
 } from "@/lib/ai/tone";
+import { accentNeedsReadableAdjust } from "@/lib/brand-contrast";
 import {
   AUTOSAVE_DEBOUNCE_MS,
   useDebouncedEffect,
@@ -63,6 +64,11 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
       initialData.logo_path,
       initialData.logo_url,
     ]
+  );
+
+  const accentIsLight = useMemo(
+    () => accentNeedsReadableAdjust(accentColor),
+    [accentColor]
   );
 
   const persistBrandKit = useCallback(async () => {
@@ -172,6 +178,12 @@ export function BrandKitForm({ initialData }: BrandKitFormProps) {
                       aria-label="Accent color hex"
                     />
                   </div>
+                  {accentIsLight && (
+                    <p className="text-xs text-muted-foreground">
+                      This accent is light on white. You can save it — slides
+                      will darken it slightly so metric text stays readable.
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="space-y-2">

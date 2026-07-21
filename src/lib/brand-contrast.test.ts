@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import {
+  accentNeedsReadableAdjust,
   contrastRatio,
   deriveSlideSupportColors,
+  ensureContrastOnWhite,
   validateBrandKitContrast,
 } from "@/lib/brand-contrast";
 
@@ -15,9 +17,21 @@ describe("brand-contrast", () => {
     expect(err).toMatch(/Primary color contrast/);
   });
 
-  it("rejects low-contrast accent", () => {
-    const err = validateBrandKitContrast("#171717", "#eeeeee");
-    expect(err).toMatch(/Accent color contrast/);
+  it("allows light decorative accents", () => {
+    expect(validateBrandKitContrast("#353131", "#f7f6e9")).toBeNull();
+    expect(validateBrandKitContrast("#171717", "#eeeeee")).toBeNull();
+  });
+
+  it("flags light accents that need readable adjust", () => {
+    expect(accentNeedsReadableAdjust("#f7f6e9")).toBe(true);
+    expect(accentNeedsReadableAdjust("#2563eb")).toBe(false);
+  });
+
+  it("darkens light accents until readable on white", () => {
+    const adjusted = ensureContrastOnWhite("#f7f6e9", 3);
+    const ratio = contrastRatio(adjusted, "#ffffff");
+    expect(ratio).not.toBeNull();
+    expect(ratio!).toBeGreaterThanOrEqual(3);
   });
 
   it("computes contrast ratio for black on white", () => {

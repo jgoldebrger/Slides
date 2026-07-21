@@ -42,25 +42,68 @@ export function contrastRatio(a: string, b: string): number | null {
 const WHITE = "#ffffff";
 
 /**
- * Org brand kit colors must remain readable on white slide backgrounds.
- * Primary ≥ 4.5:1 (text), accent ≥ 3:1 (UI chrome on slides).
+ * Org brand kit: primary must stay readable as slide text on white.
+ * Accent may be a light decorative brand color — slides darken it for text.
  */
 export function validateBrandKitContrast(
   primary: string,
   accent: string
 ): string | null {
   const primaryRatio = contrastRatio(primary, WHITE);
-  const accentRatio = contrastRatio(accent, WHITE);
-  if (primaryRatio == null || accentRatio == null) {
+  const accentParsed = parseHex(accent);
+  if (primaryRatio == null || !accentParsed) {
     return "Colors must be valid #RRGGBB hex values";
   }
   if (primaryRatio < 4.5) {
     return `Primary color contrast on white is ${primaryRatio.toFixed(2)}:1 (need ≥ 4.5:1)`;
   }
-  if (accentRatio < 3) {
-    return `Accent color contrast on white is ${accentRatio.toFixed(2)}:1 (need ≥ 3:1)`;
-  }
   return null;
+}
+
+/** True when accent would be hard to read as text on a white slide. */
+export function accentNeedsReadableAdjust(accent: string, minRatio = 3): boolean {
+  const ratio = contrastRatio(accent, WHITE);
+  return ratio == null || ratio < minRatio;
+}
+
+/**
+ * Darken (or lighten) a color until it meets min contrast on white.
+ * Preserves hue so light brand accents become usable slide text colors.
+ */
+export function ensureContrastOnWhite(color: string, minRatio = 3): string {
+  const ratio = contrastRatio(color, WHITE);
+  if (ratio != null && ratio >= minRatio) return normalizeHex(color) ?? color;
+
+  const parsed = parseHex(color);
+  if (!parsed) return "#525252";
+
+  let { r, g, b } = parsed;
+  const targetL = relativeLuminance(r, g, b);
+  // Light colors → darken toward black; already-dark failures → lighten toward black mid
+  const towardBlack = targetL >= 0.5;
+
+  for (let i = 0; i < 48; i++) {
+    if (towardBlack) {
+      r = mix(r, 0, 0.1);
+      g = mix(g, 0, 0.1);
+      b = mix(b, 0, 0.1);
+    } else {
+      r = mix(r, 0, 0.08);
+      g = mix(g, 0, 0.08);
+      b = mix(b, 0, 0.08);
+    }
+    const hex = toHex(r, g, b);
+    const next = contrastRatio(hex, WHITE);
+    if (next != null && next >= minRatio) return hex;
+  }
+
+  return "#525252";
+}
+
+function normalizeHex(hex: string): string | null {
+  const p = parseHex(hex);
+  if (!p) return null;
+  return toHex(p.r, p.g, p.b);
 }
 
 function mix(a: number, b: number, t: number): number {
@@ -76,13 +119,11 @@ export function deriveSlideSupportColors(primary: string): {
   if (!p) {
     return { muted: "#737373", border: "#e5e5e5" };
   }
-  // Muted: blend primary toward mid gray for secondary slide text
   const muted = toHex(
     mix(p.r, 115, 0.55),
     mix(p.g, 115, 0.55),
     mix(p.b, 115, 0.55)
   );
-  // Border: lighten toward white for subtle slide rules
   const border = toHex(
     mix(p.r, 255, 0.88),
     mix(p.g, 255, 0.88),

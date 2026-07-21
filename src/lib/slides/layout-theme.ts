@@ -1,6 +1,9 @@
 import type { BrandPreviewTheme, BrandTheme } from "@/lib/brand";
 import { UNBRANDED_PREVIEW_THEME } from "@/lib/brand";
-import { deriveSlideSupportColors } from "@/lib/brand-contrast";
+import {
+  deriveSlideSupportColors,
+  ensureContrastOnWhite,
+} from "@/lib/brand-contrast";
 
 export type SlideColors = {
   primary: string;
@@ -33,7 +36,8 @@ export function resolveSlideColors(
   const support = deriveSlideSupportColors(brandTheme.primaryColor);
   return {
     primary: brandTheme.primaryColor,
-    accent: brandTheme.accentColor,
+    // Light decorative accents are darkened for readable metric/text chrome
+    accent: ensureContrastOnWhite(brandTheme.accentColor, 3),
     muted: support.muted,
     border: support.border,
   };
