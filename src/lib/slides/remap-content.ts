@@ -166,9 +166,6 @@ export function remapSlideContentForLayout(
           ? `${metrics[0].label}: ${metrics[0].value}`
           : undefined);
       next.attribution = content.attribution;
-      if (!next.quote && content.title === undefined) {
-        /* keep empty — title is outside content */
-      }
       break;
     }
 
