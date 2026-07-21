@@ -62,7 +62,7 @@ export function DashboardSidebar({
     : [
         ...editorNav,
         ...(canManageTeam
-          ? [{ href: "/settings/team", label: "Team", icon: Users }]
+          ? [{ href: "/team", label: "Team", icon: Users }]
           : []),
       ];
   const homeHref = isViewer ? "/decks" : "/dashboard";

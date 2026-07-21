@@ -139,7 +139,7 @@ export async function createTeamMember(payload: unknown) {
       inviteUrl,
     });
 
-    revalidatePath("/settings/team");
+    revalidatePath("/team");
     return { success: true, invited: true as const };
   } catch (e) {
     const message = e instanceof Error ? e.message : "Failed to invite user";
@@ -316,7 +316,7 @@ export async function updateTeamMember(payload: unknown) {
     });
   }
 
-  revalidatePath("/settings/team");
+  revalidatePath("/team");
   return { success: true };
 }
 
@@ -355,7 +355,7 @@ export async function removeTeamMember(memberId: string) {
 
   if (error) return actionError(toPublicError(error));
 
-  revalidatePath("/settings/team");
+  revalidatePath("/team");
   return { success: true };
 }
 
@@ -389,7 +389,7 @@ export async function setDefaultSignupOrg() {
 
   if (error) return actionError(toPublicError(error));
 
-  revalidatePath("/settings/team");
+  revalidatePath("/team");
   return { success: true };
 }
 
@@ -409,6 +409,6 @@ export async function clearDefaultSignupOrg() {
 
   if (error) return actionError(toPublicError(error));
 
-  revalidatePath("/settings/team");
+  revalidatePath("/team");
   return { success: true };
 }

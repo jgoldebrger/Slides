@@ -10,16 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { getProfileSettings } from "@/lib/actions/profile";
 import { getOrgContext } from "@/lib/viewer-guard";
-import { canManageTeam } from "@/lib/roles";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const { isViewer, role } = await getOrgContext();
+  const { isViewer } = await getOrgContext();
   if (isViewer) redirect("/decks");
 
   const profile = await getProfileSettings();
@@ -30,22 +27,6 @@ export default async function SettingsPage() {
         <h1 className="text-xl font-semibold">Settings</h1>
         <p className="text-muted-foreground">Manage your workspace preferences.</p>
       </div>
-
-      {canManageTeam(role) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Team</CardTitle>
-            <CardDescription>
-              View all users, create accounts, and change roles.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/settings/team">Manage team</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       <Card>
         <CardHeader>
