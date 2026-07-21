@@ -15,6 +15,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { redirectViewerFromDeckEdit } from "@/lib/viewer-guard";
 
+export const maxDuration = 300;
+
 export async function generateMetadata({
   params,
 }: {

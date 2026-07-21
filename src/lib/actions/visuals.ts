@@ -5,12 +5,17 @@ import {
   isAllowedImageMime,
   type VisualStyle,
 } from "@/lib/ai/visuals";
-import { visualPromptHash } from "@/lib/ai/run-slide-visual";
-import { sendDeckEvent } from "@/lib/inngest/events";
+import {
+  runSlideVisualJob,
+  visualPromptHash,
+} from "@/lib/ai/run-slide-visual";
 import { assertDeckJobRateLimit } from "@/lib/deck-rate-limit";
 import { requireDeckAccess, requireDeckEdit } from "@/lib/permissions";
 import { getSignedStorageUrl } from "@/lib/storage/images";
 import { actionError, toPublicError } from "@/lib/errors/public-error";
+
+/** Slide visual AI can take 60–90s (vision prompt + image generation). */
+export const maxDuration = 300;
 
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
@@ -63,7 +68,77 @@ const VISUAL_STYLES = new Set<VisualStyle>([
   "abstract",
 ]);
 
-/** Enqueues AI visual creation; poll with pollAiGeneration. */
+type SlideVisualMode = "create" | "refine" | "annotate_polish";
+
+async function runSlideVisualInline({
+  supabase,
+  user,
+  deck,
+  deckId,
+  slideId,
+  mode,
+  promptHashSeed,
+  instructions,
+  visualStyle,
+  sourcePath,
+  sourceMimeType,
+  keepAnnotations,
+}: {
+  supabase: Awaited<ReturnType<typeof requireDeckEdit>>["supabase"];
+  user: Awaited<ReturnType<typeof requireDeckEdit>>["user"];
+  deck: Awaited<ReturnType<typeof requireDeckEdit>>["deck"];
+  deckId: string;
+  slideId: string;
+  mode: SlideVisualMode;
+  promptHashSeed: string;
+  instructions?: string;
+  visualStyle?: VisualStyle;
+  sourcePath?: string;
+  sourceMimeType?: string;
+  keepAnnotations?: boolean;
+}) {
+  await assertDeckJobRateLimit(deck.org_id, "generate");
+
+  const { data: genLog, error: genError } = await supabase
+    .from("ai_generations")
+    .insert({
+      deck_id: deckId,
+      org_id: deck.org_id,
+      prompt_hash: visualPromptHash(promptHashSeed),
+      model: "gpt-image-1",
+      status: "pending",
+      created_by: user.id,
+    })
+    .select("id")
+    .single();
+
+  if (genError || !genLog) {
+    return actionError("Failed to create generation job");
+  }
+
+  const result = await runSlideVisualJob({
+    deckId,
+    slideId,
+    generationId: genLog.id,
+    mode,
+    instructions,
+    visualStyle,
+    sourcePath,
+    sourceMimeType,
+    keepAnnotations,
+  });
+
+  revalidatePath(`/decks/${deckId}/editor`);
+
+  return {
+    success: true as const,
+    status: "completed" as const,
+    generationId: genLog.id as string,
+    result,
+  };
+}
+
+/** Runs AI visual creation inline (no Inngest poll required). */
 export async function createSlideVisual(
   deckId: string,
   slideId: string,
@@ -91,42 +166,17 @@ export async function createSlideVisual(
   }
 
   try {
-    await assertDeckJobRateLimit(deck.org_id, "generate");
-
-    const { data: genLog, error: genError } = await supabase
-      .from("ai_generations")
-      .insert({
-        deck_id: deckId,
-        org_id: deck.org_id,
-        prompt_hash: visualPromptHash(
-          `${slideId}:create:${visualStyle}:${instructions ?? ""}`
-        ),
-        model: "gpt-image-1",
-        status: "pending",
-        created_by: user.id,
-      })
-      .select("id")
-      .single();
-
-    if (genError || !genLog) {
-      return actionError("Failed to create generation job");
-    }
-
-    await sendDeckEvent("deck/slide.visual", {
+    return await runSlideVisualInline({
+      supabase,
+      user,
+      deck,
       deckId,
       slideId,
-      orgId: deck.org_id,
-      generationId: genLog.id,
       mode: "create",
+      promptHashSeed: `${slideId}:create:${visualStyle}:${instructions ?? ""}`,
       instructions,
       visualStyle,
     });
-
-    return {
-      success: true as const,
-      status: "processing" as const,
-      generationId: genLog.id as string,
-    };
   } catch (err) {
     return actionError(toPublicError(err, "Visual generation failed"));
   }
@@ -169,43 +219,19 @@ export async function finishSlideVisual(
       file: uploadFile,
       prefix: "source",
     });
-    await assertDeckJobRateLimit(deck.org_id, "generate");
 
-    const { data: genLog, error: genError } = await supabase
-      .from("ai_generations")
-      .insert({
-        deck_id: deckId,
-        org_id: deck.org_id,
-        prompt_hash: visualPromptHash(
-          `${slideId}:refine:${instructions ?? ""}`
-        ),
-        model: "gpt-image-1",
-        status: "pending",
-        created_by: user.id,
-      })
-      .select("id")
-      .single();
-
-    if (genError || !genLog) {
-      return actionError("Failed to create generation job");
-    }
-
-    await sendDeckEvent("deck/slide.visual", {
+    return await runSlideVisualInline({
+      supabase,
+      user,
+      deck,
       deckId,
       slideId,
-      orgId: deck.org_id,
-      generationId: genLog.id,
       mode: "refine",
+      promptHashSeed: `${slideId}:refine:${instructions ?? ""}`,
       instructions,
       sourcePath,
       sourceMimeType: mimeType,
     });
-
-    return {
-      success: true as const,
-      status: "processing" as const,
-      generationId: genLog.id as string,
-    };
   } catch (err) {
     return actionError(toPublicError(err, "Visual generation failed"));
   }
@@ -331,44 +357,19 @@ export async function polishAnnotatedVisual(
       prefix: "annotated",
     });
 
-    await assertDeckJobRateLimit(deck.org_id, "generate");
-
-    const { data: genLog, error: genError } = await supabase
-      .from("ai_generations")
-      .insert({
-        deck_id: deckId,
-        org_id: deck.org_id,
-        prompt_hash: visualPromptHash(
-          `${slideId}:annotate_polish:${keepAnnotations}:${instructions ?? ""}`
-        ),
-        model: "gpt-image-1",
-        status: "pending",
-        created_by: user.id,
-      })
-      .select("id")
-      .single();
-
-    if (genError || !genLog) {
-      return actionError("Failed to create generation job");
-    }
-
-    await sendDeckEvent("deck/slide.visual", {
+    return await runSlideVisualInline({
+      supabase,
+      user,
+      deck,
       deckId,
       slideId,
-      orgId: deck.org_id,
-      generationId: genLog.id,
       mode: "annotate_polish",
+      promptHashSeed: `${slideId}:annotate_polish:${keepAnnotations}:${instructions ?? ""}`,
       instructions,
       sourcePath,
       sourceMimeType: mimeType,
       keepAnnotations,
     });
-
-    return {
-      success: true as const,
-      status: "processing" as const,
-      generationId: genLog.id as string,
-    };
   } catch (err) {
     return actionError(toPublicError(err, "Visual polish failed"));
   }

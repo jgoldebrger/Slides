@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { ImagePlus, Pencil, Upload, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
+import { resolveVisualActionResult } from "@/lib/actions/resolve-visual-result";
 import {
   attachSlideVisual,
   createSlideVisual,
@@ -63,23 +64,10 @@ export function SlideVisualUpload({
       formData.set("style", visualStyle);
 
       const result = await createSlideVisual(deckId, slide.id, formData);
-      const actionError = getActionError(result);
-      if (actionError) {
-        toast.error(actionError);
-        return;
-      }
-      if (!("generationId" in result) || !result.generationId) {
-        toast.error("Failed to start image generation");
-        return;
-      }
-
       toast.message("Creating image…");
-      const { pollAiGeneration } = await import(
-        "@/lib/hooks/poll-ai-generation"
-      );
-      const done = await pollAiGeneration(deckId, result.generationId);
+      const visualResult = await resolveVisualActionResult(deckId, result);
       toast.success("Image created");
-      applyResult(done.result as {
+      applyResult(visualResult as {
         imagePath?: string;
         imageUrl?: string | null;
         layout?: Slide["layout"];
@@ -98,23 +86,10 @@ export function SlideVisualUpload({
     try {
       const formData = new FormData(e.currentTarget);
       const result = await finishSlideVisual(deckId, slide.id, formData);
-      const actionError = getActionError(result);
-      if (actionError) {
-        toast.error(actionError);
-        return;
-      }
-      if (!("generationId" in result) || !result.generationId) {
-        toast.error("Failed to start refine job");
-        return;
-      }
-
       toast.message("Refining visual…");
-      const { pollAiGeneration } = await import(
-        "@/lib/hooks/poll-ai-generation"
-      );
-      const done = await pollAiGeneration(deckId, result.generationId);
+      const visualResult = await resolveVisualActionResult(deckId, result);
       toast.success("Visual refined");
-      applyResult(done.result as {
+      applyResult(visualResult as {
         imagePath?: string;
         imageUrl?: string | null;
         layout?: Slide["layout"];

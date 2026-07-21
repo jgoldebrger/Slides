@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
+import { resolveVisualActionResult } from "@/lib/actions/resolve-visual-result";
 import {
   attachSlideVisual,
   polishAnnotatedVisual,
@@ -75,6 +76,7 @@ export function ImageAnnotatorModal({
   const [keepAnnotations, setKeepAnnotations] = useState(false);
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
 
   function applySlideUpdate(result: {
     imagePath?: string;
@@ -102,6 +104,7 @@ export function ImageAnnotatorModal({
 
   async function handleApply() {
     setBusy(true);
+    setStatusMessage("Saving image…");
     try {
       const blob = await exportBlob();
       if (!blob) return;
@@ -121,49 +124,49 @@ export function ImageAnnotatorModal({
       toast.error(err instanceof Error ? err.message : "Failed to apply image");
     } finally {
       setBusy(false);
+      setStatusMessage(null);
     }
   }
 
   async function handlePolish() {
     setBusy(true);
+    setStatusMessage("Uploading annotated image…");
     try {
       const blob = await exportBlob();
-      if (!blob) return;
+      if (!blob) {
+        setStatusMessage(null);
+        return;
+      }
       const formData = new FormData();
       formData.set("file", new File([blob], "annotated.png", { type: "image/png" }));
       formData.set("keepAnnotations", keepAnnotations ? "true" : "false");
       if (instructions.trim()) formData.set("instructions", instructions.trim());
 
       const result = await polishAnnotatedVisual(deckId, slide.id, formData);
-      const actionError = getActionError(result);
-      if (actionError) {
-        toast.error(actionError);
-        return;
-      }
-      if (!("generationId" in result) || !result.generationId) {
-        toast.error("Failed to start polish job");
-        return;
-      }
-
+      setStatusMessage("Polishing with AI… this may take 1–2 minutes.");
       toast.message("Polishing with AI…");
-      const { pollAiGeneration } = await import(
-        "@/lib/hooks/poll-ai-generation"
-      );
-      const done = await pollAiGeneration(deckId, result.generationId);
+      const visualResult = await resolveVisualActionResult(deckId, result);
       toast.success("Image polished");
       applySlideUpdate(
-        done.result as { imagePath?: string; imageUrl?: string | null }
+        visualResult as { imagePath?: string; imageUrl?: string | null }
       );
       onOpenChange(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Polish failed");
     } finally {
       setBusy(false);
+      setStatusMessage(null);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (busy) return;
+        onOpenChange(next);
+      }}
+    >
       <DialogContent className="max-h-[95vh] max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Annotate image</DialogTitle>
@@ -287,6 +290,12 @@ export function ImageAnnotatorModal({
             Keep annotations on polished image
           </label>
         </div>
+
+        {statusMessage && (
+          <p className="text-sm text-muted-foreground" role="status" aria-live="polite">
+            {statusMessage}
+          </p>
+        )}
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button

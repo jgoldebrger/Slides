@@ -36,6 +36,10 @@ type ImageAnnotatorCanvasProps = {
 
 type Point = { x: number; y: number };
 
+function getCanvas2d(canvas: HTMLCanvasElement) {
+  return canvas.getContext("2d", { willReadFrequently: true });
+}
+
 export const ImageAnnotatorCanvas = forwardRef<
   ImageAnnotatorCanvasHandle,
   ImageAnnotatorCanvasProps
@@ -60,7 +64,7 @@ export const ImageAnnotatorCanvas = forwardRef<
   const pushSnapshot = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = getCanvas2d(canvas);
     if (!ctx) return;
     const snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
     historyRef.current = [
@@ -73,7 +77,7 @@ export const ImageAnnotatorCanvas = forwardRef<
     const canvas = canvasRef.current;
     const img = baseImageRef.current;
     if (!canvas || !img) return;
-    const ctx = canvas.getContext("2d");
+    const ctx = getCanvas2d(canvas);
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
@@ -84,7 +88,7 @@ export const ImageAnnotatorCanvas = forwardRef<
       const canvas = canvasRef.current;
       const snapshot = historyRef.current[index];
       if (!canvas || !snapshot) return;
-      const ctx = canvas.getContext("2d");
+      const ctx = getCanvas2d(canvas);
       if (!ctx) return;
       ctx.putImageData(snapshot, 0, 0);
     },
@@ -154,7 +158,7 @@ export const ImageAnnotatorCanvas = forwardRef<
       const canvas = canvasRef.current;
       const start = startRef.current;
       if (!canvas || !start) return;
-      const ctx = canvas.getContext("2d");
+      const ctx = getCanvas2d(canvas);
       if (!ctx) return;
 
       restoreSnapshot(historyRef.current.length - 1);
@@ -207,7 +211,7 @@ export const ImageAnnotatorCanvas = forwardRef<
       if (!label?.trim()) return;
       pushSnapshot();
       const canvas = canvasRef.current;
-      const ctx = canvas?.getContext("2d");
+      const ctx = canvas ? getCanvas2d(canvas) : null;
       if (!ctx || !canvas) return;
       configureStroke(ctx);
       ctx.font = `${Math.max(14, strokeWidth * 4)}px sans-serif`;
@@ -244,7 +248,7 @@ export const ImageAnnotatorCanvas = forwardRef<
       pushSnapshot();
     } else if (tool === "rectangle" || tool === "arrow") {
       const canvas = canvasRef.current;
-      const ctx = canvas?.getContext("2d");
+      const ctx = canvas ? getCanvas2d(canvas) : null;
       if (!ctx || !startRef.current) return;
       restoreSnapshot(historyRef.current.length - 1);
       configureStroke(ctx);
@@ -262,7 +266,7 @@ export const ImageAnnotatorCanvas = forwardRef<
       pushSnapshot();
     } else if (tool === "blur") {
       const canvas = canvasRef.current;
-      const ctx = canvas?.getContext("2d");
+      const ctx = canvas ? getCanvas2d(canvas) : null;
       if (!ctx || !startRef.current) return;
       restoreSnapshot(historyRef.current.length - 1);
       const { x, y, w, h } = normalizeRect(
@@ -303,7 +307,7 @@ export const ImageAnnotatorCanvas = forwardRef<
     applyCrop: () => {
       const canvas = canvasRef.current;
       if (!canvas || !cropRect || cropRect.w < 4 || cropRect.h < 4) return;
-      const ctx = canvas.getContext("2d");
+      const ctx = getCanvas2d(canvas);
       if (!ctx) return;
       const { x, y, w, h } = cropRect;
       const cropped = ctx.getImageData(x, y, w, h);
