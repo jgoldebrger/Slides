@@ -31,6 +31,9 @@ export async function resolveVisualActionResult(
   }
 
   const { pollAiGeneration } = await import("@/lib/hooks/poll-ai-generation");
-  const done = await pollAiGeneration(deckId, result.generationId);
+  const done = await pollAiGeneration(deckId, result.generationId, {
+    timeoutMs: 480_000,
+    intervalMs: 2000,
+  });
   return done.result as VisualActionResult["result"];
 }

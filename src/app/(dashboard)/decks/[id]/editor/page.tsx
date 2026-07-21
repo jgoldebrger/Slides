@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { redirectViewerFromDeckEdit } from "@/lib/viewer-guard";
 
+/** Background slide-visual jobs (waitUntil) may run up to 5 min after the action returns. */
 export const maxDuration = 300;
 
 export async function generateMetadata({

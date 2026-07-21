@@ -20,7 +20,7 @@
 
 **TTS (player AI reader):** OpenAI `tts-1` via `POST /api/decks/[id]/narrate`. Voices: alloy, echo, fable, onyx, nova, shimmer. Audio is cached under `slide-assets/{org}/{deck}/tts/`.
 
-**Slide visuals (create / refine / annotate polish):** OpenAI `gpt-image-1`, run **inline** in the slide editor server action (up to 5 min). Annotate polish accepts a marked-up PNG; `keepAnnotations` controls whether markup is preserved. Inngest `deck/slide.visual` remains registered for compatibility but editor flows no longer depend on it.
+**Slide visuals (create / refine / annotate polish):** OpenAI `gpt-image-1`. Editor actions upload the source image, return immediately, and run generation in the background (`waitUntil` on Vercel). The client polls `ai_generations` until complete. Annotate polish uses a vision prompt with a 45s fallback to a direct text prompt.
 
 ## Inngest
 

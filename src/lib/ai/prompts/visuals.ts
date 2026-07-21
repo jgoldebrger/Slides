@@ -157,3 +157,37 @@ User instructions: ${userInstructions || "Polish into a presentation-ready visua
 
 Return ONLY the image generation prompt (max 900 characters). No quotes or explanation.`;
 }
+
+/** Fast image prompt when vision meta-prompt times out or is skipped. */
+export function buildAnnotatePolishDirectPrompt({
+  slideTitle,
+  slideContext,
+  userInstructions,
+  keepAnnotations,
+  brandColors,
+}: {
+  slideTitle: string;
+  slideContext: string;
+  userInstructions?: string;
+  keepAnnotations: boolean;
+  brandColors?: { primary: string; accent: string };
+}) {
+  const brandLine = brandColors
+    ? `Brand colors primary ${brandColors.primary}, accent ${brandColors.accent}.`
+    : "Professional blue and neutral corporate palette.";
+
+  const annotationRule = keepAnnotations
+    ? "Preserve user annotation markup exactly."
+    : "Remove editor markup; use highlighted areas as guidance only.";
+
+  const prompt = [
+    `Polished 16:9 executive presentation visual for slide "${slideTitle}".`,
+    annotationRule,
+    brandLine,
+    `Context: ${slideContext || "project update"}.`,
+    `Edits: ${userInstructions || "Polish for a clean corporate deck."}`,
+    "High contrast, no watermarks, no invented data.",
+  ].join(" ");
+
+  return prompt.slice(0, 900);
+}

@@ -11,6 +11,7 @@ import {
 } from "@/lib/ai/run-slide-visual";
 import { assertDeckJobRateLimit } from "@/lib/deck-rate-limit";
 import { requireDeckAccess, requireDeckEdit } from "@/lib/permissions";
+import { scheduleBackgroundWork } from "@/lib/schedule-background";
 import { getSignedStorageUrl } from "@/lib/storage/images";
 import { actionError, toPublicError } from "@/lib/errors/public-error";
 
@@ -67,7 +68,7 @@ const VISUAL_STYLES = new Set<VisualStyle>([
 
 type SlideVisualMode = "create" | "refine" | "annotate_polish";
 
-async function runSlideVisualInline({
+async function enqueueSlideVisualJob({
   supabase,
   user,
   deck,
@@ -113,29 +114,29 @@ async function runSlideVisualInline({
     return actionError("Failed to create generation job");
   }
 
-  const result = await runSlideVisualJob({
-    deckId,
-    slideId,
-    generationId: genLog.id,
-    mode,
-    instructions,
-    visualStyle,
-    sourcePath,
-    sourceMimeType,
-    keepAnnotations,
+  scheduleBackgroundWork(async () => {
+    await runSlideVisualJob({
+      deckId,
+      slideId,
+      generationId: genLog.id,
+      mode,
+      instructions,
+      visualStyle,
+      sourcePath,
+      sourceMimeType,
+      keepAnnotations,
+    });
+    revalidatePath(`/decks/${deckId}/editor`);
   });
-
-  revalidatePath(`/decks/${deckId}/editor`);
 
   return {
     success: true as const,
-    status: "completed" as const,
+    status: "processing" as const,
     generationId: genLog.id as string,
-    result,
   };
 }
 
-/** Runs AI visual creation inline (no Inngest poll required). */
+/** Enqueues AI visual creation; poll with pollAiGeneration. */
 export async function createSlideVisual(
   deckId: string,
   slideId: string,
@@ -163,7 +164,7 @@ export async function createSlideVisual(
   }
 
   try {
-    return await runSlideVisualInline({
+    return await enqueueSlideVisualJob({
       supabase,
       user,
       deck,
@@ -217,7 +218,7 @@ export async function finishSlideVisual(
       prefix: "source",
     });
 
-    return await runSlideVisualInline({
+    return await enqueueSlideVisualJob({
       supabase,
       user,
       deck,
@@ -354,7 +355,7 @@ export async function polishAnnotatedVisual(
       prefix: "annotated",
     });
 
-    return await runSlideVisualInline({
+    return await enqueueSlideVisualJob({
       supabase,
       user,
       deck,

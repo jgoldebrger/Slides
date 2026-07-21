@@ -6,6 +6,7 @@ import {
   generateSlideImage,
   type VisualStyle,
 } from "@/lib/ai/visuals";
+import { buildAnnotatePolishDirectPrompt } from "@/lib/ai/prompts/visuals";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSignedStorageUrl } from "@/lib/storage/images";
 
@@ -108,15 +109,30 @@ export async function runSlideVisualJob({
       }
       const buffer = Buffer.from(await fileData.arrayBuffer());
       if (mode === "annotate_polish") {
-        dallePrompt = await buildVisualPromptFromAnnotatedUpload({
-          imageBytes: new Uint8Array(buffer),
-          mimeType: sourceMimeType ?? "image/png",
-          slideTitle: slide.title,
-          slideContext,
-          userInstructions: instructions,
-          keepAnnotations: keepAnnotations ?? false,
-          brandColors,
-        });
+        try {
+          dallePrompt = await Promise.race([
+            buildVisualPromptFromAnnotatedUpload({
+              imageBytes: new Uint8Array(buffer),
+              mimeType: sourceMimeType ?? "image/png",
+              slideTitle: slide.title,
+              slideContext,
+              userInstructions: instructions,
+              keepAnnotations: keepAnnotations ?? false,
+              brandColors,
+            }),
+            new Promise<string>((_, reject) => {
+              setTimeout(() => reject(new Error("Vision prompt timed out")), 45_000);
+            }),
+          ]);
+        } catch {
+          dallePrompt = buildAnnotatePolishDirectPrompt({
+            slideTitle: slide.title,
+            slideContext,
+            userInstructions: instructions,
+            keepAnnotations: keepAnnotations ?? false,
+            brandColors,
+          });
+        }
       } else {
         dallePrompt = await buildVisualPromptFromUpload({
           imageBytes: new Uint8Array(buffer),
