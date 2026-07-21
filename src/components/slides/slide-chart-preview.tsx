@@ -10,22 +10,25 @@ import {
   YAxis,
 } from "recharts";
 import {
-  normalizeChartData,
+  resolveChartData,
   type ChartPoint,
+  type MetricLike,
 } from "@/lib/slides/metrics-to-chart";
 
 type SlideChartPreviewProps = {
   chartData?: Array<Record<string, string | number>> | null;
+  metrics?: MetricLike[] | null;
   primaryColor: string;
   mutedColor: string;
 };
 
 export function SlideChartPreview({
   chartData,
+  metrics,
   primaryColor,
   mutedColor,
 }: SlideChartPreviewProps) {
-  const data: ChartPoint[] = normalizeChartData(chartData);
+  const data: ChartPoint[] = resolveChartData({ metrics, chartData });
 
   if (!data.length) {
     return (

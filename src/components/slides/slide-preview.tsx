@@ -229,35 +229,48 @@ function SlideLayoutContent({
       );
     }
 
-    case "metrics_grid":
+    case "metrics_grid": {
+      const metrics = content.metrics ?? [];
+      const fallbackBullets =
+        metrics.length === 0 ? (content.bullets ?? []) : [];
       return (
         <div className="flex h-full flex-col">
           <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
             {title}
           </h2>
-          <div className="grid flex-1 grid-cols-2 gap-4">
-            {(content.metrics ?? []).map((metric, i) => (
-              <div
-                key={i}
-                className="rounded-lg border p-4 text-center"
-                style={{ borderColor: colors.border }}
-              >
-                <p className="text-2xl font-bold" style={accentStyle}>
-                  {metric.value}
-                </p>
-                <p className="mt-1 text-xs" style={mutedStyle}>
-                  {metric.label}
-                </p>
-                {metric.trend && (
-                  <span className="mt-1 text-xs capitalize text-muted-foreground">
-                    {metric.trend}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
+          {metrics.length > 0 ? (
+            <div className="grid flex-1 grid-cols-2 gap-4">
+              {metrics.map((metric, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border p-4 text-center"
+                  style={{ borderColor: colors.border }}
+                >
+                  <p className="text-2xl font-bold" style={accentStyle}>
+                    {metric.value}
+                  </p>
+                  <p className="mt-1 text-xs" style={mutedStyle}>
+                    {metric.label}
+                  </p>
+                  {metric.trend && (
+                    <span className="mt-1 text-xs capitalize text-muted-foreground">
+                      {metric.trend}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <PreviewBulletList items={fallbackBullets} mutedStyle={mutedStyle} />
+          )}
+          {!metrics.length && !fallbackBullets.length && content.body && (
+            <p className="text-sm" style={mutedStyle}>
+              {content.body}
+            </p>
+          )}
         </div>
       );
+    }
 
     case "timeline":
       return (
@@ -378,17 +391,29 @@ function SlideLayoutContent({
         </div>
       );
 
-    case "chart":
+    case "chart": {
+      const hasChart =
+        Array.isArray(content.chartData) && content.chartData.length > 0;
+      const hasMetrics =
+        Array.isArray(content.metrics) && content.metrics.length > 0;
       return (
         <div className="flex h-full flex-col">
           <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
             {title}
           </h2>
-          <SlideChartPreview
-            chartData={content.chartData}
-            primaryColor={colors.primary}
-            mutedColor={colors.muted}
-          />
+          {hasChart || hasMetrics ? (
+            <SlideChartPreview
+              chartData={content.chartData}
+              metrics={content.metrics}
+              primaryColor={colors.primary}
+              mutedColor={colors.muted}
+            />
+          ) : (
+            <PreviewBulletList
+              items={content.bullets ?? []}
+              mutedStyle={mutedStyle}
+            />
+          )}
           {content.body && (
             <p className="mt-2 text-xs" style={mutedStyle}>
               {content.body}
@@ -396,6 +421,7 @@ function SlideLayoutContent({
           )}
         </div>
       );
+    }
 
     case "quote":
       return (
