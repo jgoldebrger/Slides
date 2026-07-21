@@ -14,9 +14,6 @@ import { requireDeckAccess, requireDeckEdit } from "@/lib/permissions";
 import { getSignedStorageUrl } from "@/lib/storage/images";
 import { actionError, toPublicError } from "@/lib/errors/public-error";
 
-/** Slide visual AI can take 60–90s (vision prompt + image generation). */
-export const maxDuration = 300;
-
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 
 function validateImageFile(file: File | null) {
