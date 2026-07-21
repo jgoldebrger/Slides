@@ -18,6 +18,8 @@
 
 **Usage logging:** `ai_generations` table (model, tokens, prompt_hash, status)
 
+**TTS (player AI reader):** OpenAI `tts-1` via `POST /api/decks/[id]/narrate`. Voices: alloy, echo, fable, onyx, nova, shimmer. Audio is cached under `slide-assets/{org}/{deck}/tts/`.
+
 ## Inngest
 
 **Purpose:** Background jobs (AI generation, PPTX export, email)

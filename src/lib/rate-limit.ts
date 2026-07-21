@@ -2,6 +2,7 @@ export type RateLimitAction =
   | "outline"
   | "generate"
   | "export"
+  | "narrate"
   | "auth_login"
   | "auth_signup"
   | "auth_reset";
@@ -10,6 +11,7 @@ const DEFAULT_LIMITS: Record<RateLimitAction, number> = {
   outline: 20,
   generate: 20,
   export: 30,
+  narrate: 120,
   auth_login: 20,
   auth_signup: 10,
   auth_reset: 5,

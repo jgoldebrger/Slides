@@ -12,27 +12,26 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { BrandPreviewTheme } from "@/lib/brand";
 import { SlidePreview } from "@/components/slides/slide-preview";
 import { PlayerBackgroundSettings } from "@/components/decks/player-background-settings";
 import {
+  AI_TTS_VOICE_LABELS,
+  AI_TTS_VOICES,
+  DEFAULT_AI_TTS_VOICE,
+  type AiTtsVoice,
+} from "@/lib/ai/tts-voices";
+import {
   buildSlideNarration,
   loadNarrationPrefs,
-  preferredSpeechVoices,
   saveNarrationPrefs,
-  speakText,
-  stopSpeaking,
 } from "@/lib/slides/narration";
 import type { Slide } from "@/types/slide";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 2] as const;
-const PITCH_OPTIONS = [
-  { value: 0.8, label: "Low" },
-  { value: 1, label: "Default" },
-  { value: 1.2, label: "High" },
-] as const;
 const BASE_SLIDE_MS = 4000;
 
 type SlidePlayerProps = {
@@ -43,6 +42,8 @@ type SlidePlayerProps = {
   backgroundImageUrl?: string | null;
   viewerMode?: boolean;
   shareMode?: boolean;
+  /** Required for AI narration on public share links */
+  shareToken?: string | null;
   applyBranding?: boolean;
   brandTheme?: BrandPreviewTheme | null;
 };
@@ -55,6 +56,7 @@ export function SlidePlayer({
   backgroundImageUrl,
   viewerMode = false,
   shareMode = false,
+  shareToken = null,
   applyBranding = false,
   brandTheme = null,
 }: SlidePlayerProps) {
@@ -64,25 +66,42 @@ export function SlidePlayer({
   const [bgMuted, setBgMuted] = useState(false);
   const [bgVolume, setBgVolume] = useState(0.25);
   const [narrationEnabled, setNarrationEnabled] = useState(!shareMode);
-  const [narrationVoiceURI, setNarrationVoiceURI] = useState<string | null>(
-    null
-  );
-  const [narrationPitch, setNarrationPitch] = useState(1);
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [narrationVoice, setNarrationVoice] =
+    useState<AiTtsVoice>(DEFAULT_AI_TTS_VOICE);
+  const [narrationLoading, setNarrationLoading] = useState(false);
   const [prefsReady, setPrefsReady] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const bgAudioRef = useRef<HTMLAudioElement | null>(null);
+  const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
+  const narrationObjectUrlRef = useRef<string | null>(null);
+  const narrateAbortRef = useRef<AbortController | null>(null);
   const presentationRef = useRef<HTMLDivElement | null>(null);
   const playingRef = useRef(false);
   const indexRef = useRef(0);
 
+  const stopNarrationAudio = useCallback(() => {
+    narrateAbortRef.current?.abort();
+    narrateAbortRef.current = null;
+    const audio = narrationAudioRef.current;
+    if (audio) {
+      audio.onended = null;
+      audio.onerror = null;
+      audio.pause();
+      audio.removeAttribute("src");
+    }
+    if (narrationObjectUrlRef.current) {
+      URL.revokeObjectURL(narrationObjectUrlRef.current);
+      narrationObjectUrlRef.current = null;
+    }
+    setNarrationLoading(false);
+  }, []);
+
   useEffect(() => {
     const prefs = loadNarrationPrefs(!shareMode);
     setNarrationEnabled(prefs.enabled);
-    setNarrationVoiceURI(prefs.voiceURI);
-    setNarrationPitch(prefs.pitch);
+    setNarrationVoice(prefs.voice);
     setPrefsReady(true);
   }, [shareMode]);
 
@@ -90,37 +109,19 @@ export function SlidePlayer({
     if (!prefsReady) return;
     saveNarrationPrefs({
       enabled: narrationEnabled,
-      voiceURI: narrationVoiceURI,
-      pitch: narrationPitch,
+      voice: narrationVoice,
     });
-  }, [prefsReady, narrationEnabled, narrationVoiceURI, narrationPitch]);
-
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.speechSynthesis) return;
-
-    function refreshVoices() {
-      setVoices(preferredSpeechVoices());
-    }
-
-    refreshVoices();
-    window.speechSynthesis.addEventListener("voiceschanged", refreshVoices);
-    return () => {
-      window.speechSynthesis.removeEventListener(
-        "voiceschanged",
-        refreshVoices
-      );
-    };
-  }, []);
+  }, [prefsReady, narrationEnabled, narrationVoice]);
 
   const current = sorted[index];
   const goTo = useCallback(
     (next: number) => {
-      stopSpeaking();
+      stopNarrationAudio();
       const clamped = Math.max(0, Math.min(sorted.length - 1, next));
       indexRef.current = clamped;
       setIndex(clamped);
     },
-    [sorted.length]
+    [sorted.length, stopNarrationAudio]
   );
 
   const advanceOrStop = useCallback(() => {
@@ -134,7 +135,7 @@ export function SlidePlayer({
   }, [goTo, sorted.length]);
 
   const playCurrentSlide = useCallback(() => {
-    if (!playingRef.current) return;
+    if (!playingRef.current) return () => undefined;
 
     if (!narrationEnabled) {
       const dwellMs = Math.max(1500, BASE_SLIDE_MS / playbackSpeed);
@@ -143,47 +144,110 @@ export function SlidePlayer({
     }
 
     const slide = sorted[indexRef.current];
-    speakText(buildSlideNarration(slide), {
-      rate: playbackSpeed,
-      pitch: narrationPitch,
-      voiceURI: narrationVoiceURI,
-      onEnd: advanceOrStop,
-      onError: () => {
+    if (!slide) {
+      advanceOrStop();
+      return () => undefined;
+    }
+
+    const abort = new AbortController();
+    narrateAbortRef.current = abort;
+    setNarrationLoading(true);
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/decks/${deckId}/narrate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slideId: slide.id,
+            voice: narrationVoice,
+            speed: playbackSpeed,
+            ...(shareToken ? { shareToken } : {}),
+          }),
+          signal: abort.signal,
+        });
+
+        if (!res.ok) {
+          let message = "Could not generate AI voice";
+          try {
+            const body = (await res.json()) as {
+              error?: { message?: string };
+            };
+            if (body.error?.message) message = body.error.message;
+          } catch {
+            // ignore
+          }
+          throw new Error(message);
+        }
+
+        const blob = await res.blob();
+        if (abort.signal.aborted || !playingRef.current) return;
+
+        if (narrationObjectUrlRef.current) {
+          URL.revokeObjectURL(narrationObjectUrlRef.current);
+        }
+        const url = URL.createObjectURL(blob);
+        narrationObjectUrlRef.current = url;
+
+        const audio = narrationAudioRef.current;
+        if (!audio) return;
+
+        audio.src = url;
+        audio.onended = () => advanceOrStop();
+        audio.onerror = () => {
+          toast.error("AI voice playback failed");
+          setPlaying(false);
+          playingRef.current = false;
+        };
+        setNarrationLoading(false);
+        await audio.play();
+      } catch (err) {
+        if (abort.signal.aborted) return;
+        setNarrationLoading(false);
+        toast.error(
+          err instanceof Error ? err.message : "Could not generate AI voice"
+        );
         setPlaying(false);
         playingRef.current = false;
-      },
-    });
+      }
+    })();
+
+    return () => {
+      abort.abort();
+      stopNarrationAudio();
+    };
   }, [
     advanceOrStop,
+    deckId,
     narrationEnabled,
-    narrationPitch,
-    narrationVoiceURI,
+    narrationVoice,
     playbackSpeed,
+    shareToken,
     sorted,
+    stopNarrationAudio,
   ]);
 
   useEffect(() => {
     playingRef.current = playing;
     if (!playing) {
-      stopSpeaking();
-      audioRef.current?.pause();
+      stopNarrationAudio();
+      bgAudioRef.current?.pause();
       return;
     }
 
-    audioRef.current?.play().catch(() => undefined);
+    bgAudioRef.current?.play().catch(() => undefined);
     const cleanup = playCurrentSlide();
     return () => {
       cleanup?.();
-      stopSpeaking();
     };
   }, [
     playing,
     index,
     narrationEnabled,
-    narrationPitch,
-    narrationVoiceURI,
+    narrationVoice,
     playbackSpeed,
     playCurrentSlide,
+    stopNarrationAudio,
   ]);
 
   useEffect(() => {
@@ -191,19 +255,17 @@ export function SlidePlayer({
   }, [index]);
 
   useEffect(() => {
-    const audio = audioRef.current;
+    const audio = bgAudioRef.current;
     if (!audio) return;
     audio.volume = bgMuted ? 0 : bgVolume;
-    audio.playbackRate = playbackSpeed;
-  }, [bgVolume, bgMuted, playbackSpeed]);
+  }, [bgVolume, bgMuted]);
 
   useEffect(() => {
-    const audio = audioRef.current;
     return () => {
-      stopSpeaking();
-      audio?.pause();
+      stopNarrationAudio();
+      bgAudioRef.current?.pause();
     };
-  }, []);
+  }, [stopNarrationAudio]);
 
   useEffect(() => {
     function onFullscreenChange() {
@@ -306,13 +368,15 @@ export function SlidePlayer({
                 {viewerMode ? "← Back to presentations" : "← Back to editor"}
               </Link>
             )}
-            <h1 className="mt-2 text-xl font-semibold tracking-tight">{deckName}</h1>
+            <h1 className="mt-2 text-xl font-semibold tracking-tight">
+              {deckName}
+            </h1>
             <p className="text-sm text-muted-foreground">
               {shareMode
                 ? "View-only link"
                 : viewerMode
                   ? "Presentation"
-                  : "Slide player with narration"}
+                  : "Slide player with AI voice"}
             </p>
           </div>
           {!viewerMode && !shareMode && (
@@ -326,15 +390,15 @@ export function SlidePlayer({
       )}
 
       {backgroundAudioUrl && (
-        <audio ref={audioRef} src={backgroundAudioUrl} loop preload="auto" />
+        <audio ref={bgAudioRef} src={backgroundAudioUrl} loop preload="auto" />
       )}
+      <audio ref={narrationAudioRef} preload="auto" className="hidden" />
 
       <div
         ref={presentationRef}
         className={cn(
           "flex flex-col",
-          isFullscreen &&
-            "fixed inset-0 z-50 bg-foreground p-4 sm:p-8"
+          isFullscreen && "fixed inset-0 z-50 bg-foreground p-4 sm:p-8"
         )}
       >
         {isFullscreen && (
@@ -342,6 +406,7 @@ export function SlidePlayer({
             <p className="truncate text-sm font-medium">{deckName}</p>
             <p className="text-sm text-background/90">
               Slide {index + 1} of {sorted.length}
+              {narrationLoading ? " · Generating voice…" : ""}
             </p>
           </div>
         )}
@@ -437,7 +502,10 @@ export function SlidePlayer({
                 }}
                 disabled={index === 0}
                 aria-label="Previous slide"
-                className={cn(isFullscreen && "border-background/30 bg-background/10 text-background hover:bg-background/20")}
+                className={cn(
+                  isFullscreen &&
+                    "border-background/30 bg-background/10 text-background hover:bg-background/20"
+                )}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -445,7 +513,8 @@ export function SlidePlayer({
                 onClick={togglePlay}
                 className={cn(
                   "gap-2 px-6",
-                  isFullscreen && "bg-background text-foreground hover:bg-background/90"
+                  isFullscreen &&
+                    "bg-background text-foreground hover:bg-background/90"
                 )}
               >
                 {playing ? (
@@ -467,7 +536,10 @@ export function SlidePlayer({
                 }}
                 disabled={index >= sorted.length - 1}
                 aria-label="Next slide"
-                className={cn(isFullscreen && "border-background/30 bg-background/10 text-background hover:bg-background/20")}
+                className={cn(
+                  isFullscreen &&
+                    "border-background/30 bg-background/10 text-background hover:bg-background/20"
+                )}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -517,73 +589,52 @@ export function SlidePlayer({
                   checked={narrationEnabled}
                   onChange={(e) => {
                     setNarrationEnabled(e.target.checked);
-                    if (!e.target.checked) stopSpeaking();
+                    if (!e.target.checked) stopNarrationAudio();
                   }}
                 />
                 AI reader
               </label>
 
               {narrationEnabled && (
-                <>
-                  <label
+                <label
+                  className={cn(
+                    "flex items-center gap-2 text-sm",
+                    isFullscreen && "text-background/90"
+                  )}
+                >
+                  <span className="hidden sm:inline">Voice</span>
+                  <select
+                    value={narrationVoice}
+                    onChange={(e) => {
+                      setNarrationVoice(e.target.value as AiTtsVoice);
+                      if (playing) stopNarrationAudio();
+                    }}
                     className={cn(
-                      "flex items-center gap-2 text-sm",
-                      isFullscreen && "text-background/90"
+                      "h-9 max-w-[11rem] rounded-md border border-input bg-background px-2 text-sm sm:max-w-[14rem]",
+                      isFullscreen &&
+                        "border-background/30 bg-background/10 text-background"
                     )}
+                    aria-label="AI narration voice"
                   >
-                    <span className="hidden sm:inline">Voice</span>
-                    <select
-                      value={narrationVoiceURI ?? ""}
-                      onChange={(e) => {
-                        const next = e.target.value || null;
-                        setNarrationVoiceURI(next);
-                        if (playing) stopSpeaking();
-                      }}
-                      className={cn(
-                        "h-9 max-w-[10rem] rounded-md border border-input bg-background px-2 text-sm sm:max-w-[14rem]",
-                        isFullscreen &&
-                          "border-background/30 bg-background/10 text-background"
-                      )}
-                      aria-label="Narration voice"
-                    >
-                      <option value="">Browser default</option>
-                      {voices.map((voice) => (
-                        <option key={voice.voiceURI} value={voice.voiceURI}>
-                          {voice.name}
-                          {voice.lang ? ` (${voice.lang})` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    {AI_TTS_VOICES.map((voice) => (
+                      <option key={voice} value={voice}>
+                        {AI_TTS_VOICE_LABELS[voice]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
-                  <label
-                    className={cn(
-                      "flex items-center gap-2 text-sm",
-                      isFullscreen && "text-background/90"
-                    )}
-                  >
-                    <span className="hidden sm:inline">Pitch</span>
-                    <select
-                      value={narrationPitch}
-                      onChange={(e) => {
-                        setNarrationPitch(Number(e.target.value));
-                        if (playing) stopSpeaking();
-                      }}
-                      className={cn(
-                        "h-9 rounded-md border border-input bg-background px-2 text-sm",
-                        isFullscreen &&
-                          "border-background/30 bg-background/10 text-background"
-                      )}
-                      aria-label="Narration pitch"
-                    >
-                      {PITCH_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </>
+              {narrationLoading && (
+                <span
+                  className={cn(
+                    "text-xs text-muted-foreground",
+                    isFullscreen && "text-background/90"
+                  )}
+                  aria-live="polite"
+                >
+                  Generating voice…
+                </span>
               )}
 
               {backgroundAudioUrl && (
@@ -622,9 +673,12 @@ export function SlidePlayer({
                 variant="outline"
                 size="icon"
                 onClick={() => void toggleFullscreen()}
-                aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                aria-label={
+                  isFullscreen ? "Exit fullscreen" : "Enter fullscreen"
+                }
                 className={cn(
-                  isFullscreen && "border-background/30 bg-background/10 text-background hover:bg-background/20"
+                  isFullscreen &&
+                    "border-background/30 bg-background/10 text-background hover:bg-background/20"
                 )}
               >
                 {isFullscreen ? (
@@ -641,8 +695,8 @@ export function SlidePlayer({
                 isFullscreen && "text-background/90"
               )}
             >
-              Shortcuts: ← → navigate · Space play/pause · F fullscreen · Home/End
-              first/last
+              Shortcuts: ← → navigate · Space play/pause · F fullscreen ·
+              Home/End first/last
             </p>
           </div>
         </div>
@@ -654,7 +708,7 @@ export function SlidePlayer({
           aria-live="polite"
         >
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Now reading
+            AI reader script
           </p>
           <p className="mt-1 line-clamp-3">{buildSlideNarration(current)}</p>
         </div>

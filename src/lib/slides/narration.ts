@@ -1,4 +1,9 @@
 import type { Slide } from "@/types/slide";
+import {
+  DEFAULT_AI_TTS_VOICE,
+  isAiTtsVoice,
+  type AiTtsVoice,
+} from "@/lib/ai/tts-voices";
 
 export function buildSlideNarration(slide: Slide): string {
   const parts: string[] = [];
@@ -13,9 +18,7 @@ export function buildSlideNarration(slide: Slide): string {
 
   if (slide.content.metrics?.length) {
     parts.push(
-      slide.content.metrics
-        .map((m) => `${m.label}: ${m.value}`)
-        .join(". ")
+      slide.content.metrics.map((m) => `${m.label}: ${m.value}`).join(". ")
     );
   }
 
@@ -30,96 +33,19 @@ export function buildSlideNarration(slide: Slide): string {
   return parts.join(". ");
 }
 
-export type SpeakOptions = {
-  rate?: number;
-  pitch?: number;
-  /** SpeechSynthesisVoice.voiceURI */
-  voiceURI?: string | null;
-  lang?: string;
-  onEnd?: () => void;
-  onError?: () => void;
-};
-
-export function listSpeechVoices(): SpeechSynthesisVoice[] {
-  if (typeof window === "undefined" || !window.speechSynthesis) return [];
-  return window.speechSynthesis.getVoices();
-}
-
-/** Prefer English voices, then everything else; de-dupe by voiceURI. */
-export function preferredSpeechVoices(
-  voices: SpeechSynthesisVoice[] = listSpeechVoices()
-): SpeechSynthesisVoice[] {
-  const seen = new Set<string>();
-  const unique = voices.filter((v) => {
-    if (!v.voiceURI || seen.has(v.voiceURI)) return false;
-    seen.add(v.voiceURI);
-    return true;
-  });
-
-  const en = unique.filter((v) => v.lang.toLowerCase().startsWith("en"));
-  const rest = unique.filter((v) => !v.lang.toLowerCase().startsWith("en"));
-  return [...en, ...rest];
-}
-
-export function findSpeechVoice(
-  voiceURI: string | null | undefined,
-  voices: SpeechSynthesisVoice[] = listSpeechVoices()
-): SpeechSynthesisVoice | null {
-  if (!voiceURI) return null;
-  return voices.find((v) => v.voiceURI === voiceURI) ?? null;
-}
-
-export function speakText(
-  text: string,
-  options?: SpeakOptions
-): SpeechSynthesisUtterance | null {
-  if (typeof window === "undefined" || !window.speechSynthesis) return null;
-  if (!text.trim()) {
-    options?.onEnd?.();
-    return null;
-  }
-
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate = options?.rate ?? 1;
-  utterance.pitch = options?.pitch ?? 1;
-  if (options?.lang) utterance.lang = options.lang;
-
-  const voice = findSpeechVoice(options?.voiceURI);
-  if (voice) {
-    utterance.voice = voice;
-    utterance.lang = voice.lang;
-  }
-
-  utterance.onend = () => options?.onEnd?.();
-  utterance.onerror = () => options?.onError?.();
-  window.speechSynthesis.speak(utterance);
-  return utterance;
-}
-
-export function stopSpeaking() {
-  if (typeof window !== "undefined" && window.speechSynthesis) {
-    window.speechSynthesis.cancel();
-  }
-}
-
-const STORAGE_KEY = "updatedeck.player.narration";
+const STORAGE_KEY = "updatedeck.player.ai-narration";
 
 export type NarrationPrefs = {
   enabled: boolean;
-  voiceURI: string | null;
-  pitch: number;
+  voice: AiTtsVoice;
 };
 
 export const DEFAULT_NARRATION_PREFS: NarrationPrefs = {
   enabled: true,
-  voiceURI: null,
-  pitch: 1,
+  voice: DEFAULT_AI_TTS_VOICE,
 };
 
-export function loadNarrationPrefs(
-  fallbackEnabled = true
-): NarrationPrefs {
+export function loadNarrationPrefs(fallbackEnabled = true): NarrationPrefs {
   if (typeof window === "undefined") {
     return { ...DEFAULT_NARRATION_PREFS, enabled: fallbackEnabled };
   }
@@ -128,16 +54,16 @@ export function loadNarrationPrefs(
     if (!raw) {
       return { ...DEFAULT_NARRATION_PREFS, enabled: fallbackEnabled };
     }
-    const parsed = JSON.parse(raw) as Partial<NarrationPrefs>;
+    const parsed = JSON.parse(raw) as Partial<NarrationPrefs> & {
+      voiceURI?: string;
+      pitch?: number;
+    };
     return {
       enabled:
         typeof parsed.enabled === "boolean" ? parsed.enabled : fallbackEnabled,
-      voiceURI:
-        typeof parsed.voiceURI === "string" ? parsed.voiceURI : null,
-      pitch:
-        typeof parsed.pitch === "number" && parsed.pitch >= 0.5 && parsed.pitch <= 2
-          ? parsed.pitch
-          : 1,
+      voice: isAiTtsVoice(parsed.voice)
+        ? parsed.voice
+        : DEFAULT_AI_TTS_VOICE,
     };
   } catch {
     return { ...DEFAULT_NARRATION_PREFS, enabled: fallbackEnabled };
@@ -151,4 +77,9 @@ export function saveNarrationPrefs(prefs: NarrationPrefs) {
   } catch {
     // ignore quota / private mode
   }
+}
+
+/** @deprecated Browser TTS removed — generative OpenAI voice is used instead. */
+export function stopSpeaking() {
+  // no-op kept for call-site compatibility during migration
 }

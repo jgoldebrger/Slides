@@ -184,6 +184,7 @@ export default async function SharedDeckViewPage({
           backgroundImageUrl={backgroundImageUrl}
           viewerMode
           shareMode
+          shareToken={token}
           applyBranding={applyBranding}
           brandTheme={brandTheme}
         />
