@@ -6,7 +6,15 @@ import { deckPageTitle } from "@/lib/page-title";
 import { requireDeckAccess } from "@/lib/permissions";
 import { redirectViewerFromDeckEdit } from "@/lib/viewer-guard";
 import { audienceFromDeckMetadata } from "@/lib/ai/load-deck-audience";
-import type { DeckOutline } from "@/types/slide";
+import {
+  describeProjectUpdatesCoverage,
+  getProjectUpdatesCoverage,
+  isProjectUpdatesSparse,
+} from "@/lib/ai/project-updates-context";
+import { defaultIncludedSectionsForDeckType } from "@/lib/ai/update-sections";
+import { parseDeckMetadata } from "@/lib/validations/deck-metadata";
+import { createClient } from "@/lib/supabase/server";
+import type { DeckOutline, DeckType } from "@/types/slide";
 
 export async function generateMetadata({
   params,
@@ -35,6 +43,22 @@ export default async function DeckOutlinePage({
 
   const outline = deck.outline as DeckOutline | null;
   const audience = audienceFromDeckMetadata(deck.metadata);
+  const deckType = deck.type as DeckType;
+  const metadata = parseDeckMetadata(deck.metadata);
+
+  const supabase = await createClient();
+  const { data: updates } = await supabase
+    .from("project_updates")
+    .select("*")
+    .eq("project_id", deck.project_id)
+    .maybeSingle();
+
+  const updatesSparse = isProjectUpdatesSparse(updates);
+  const sectionCoverage = getProjectUpdatesCoverage(updates);
+  const updatesCoverage = describeProjectUpdatesCoverage(sectionCoverage);
+  const initialIncludedSections =
+    (metadata.includedSections as import("@/lib/ai/update-sections").ProjectUpdateSectionId[] | undefined) ??
+    defaultIncludedSectionsForDeckType(deckType);
 
   return (
     <div className="space-y-6">
@@ -59,6 +83,13 @@ export default async function DeckOutlinePage({
         initialOutline={outline}
         deckStatus={deck.status}
         initialAudience={audience}
+        deckType={deckType}
+        initialIncludedSections={initialIncludedSections}
+        initialDeckBrief={metadata.deckBrief ?? ""}
+        sectionCoverage={sectionCoverage}
+        projectId={deck.project_id}
+        updatesSparse={updatesSparse}
+        updatesCoverage={updatesCoverage}
       />
     </div>
   );

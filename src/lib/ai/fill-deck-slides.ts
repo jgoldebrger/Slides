@@ -6,6 +6,8 @@ import { loadOrgAiTone } from "@/lib/ai/load-org-tone";
 import { loadDeckAudience } from "@/lib/ai/load-deck-audience";
 import { loadOrgDeckStyle } from "@/lib/ai/load-org-deck-style";
 import { layoutSuggestionHint } from "@/lib/ai/suggest-layout";
+import { contentFocusFromMetadata } from "@/lib/ai/load-deck-content-focus";
+import { prepareProjectUpdatesForDeck } from "@/lib/ai/project-updates-context";
 import { buildSlideFillPrompt } from "@/lib/ai/prompts/slides";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
 import { replaceDeckSlidesAtomic } from "@/lib/decks/slide-mutations";
@@ -46,6 +48,14 @@ export async function fillDeckSlides(deckId: string, userId: string) {
     .eq("project_id", deck.project_id)
     .single();
 
+  const contentFocus = contentFocusFromMetadata(
+    deck.metadata,
+    deck.type as DeckType
+  );
+  const projectUpdates = prepareProjectUpdatesForDeck(
+    updates,
+    contentFocus.includedSections
+  );
   const aiTone = await loadOrgAiTone(supabase, deck.org_id);
   const audience = await loadDeckAudience(supabase, deckId);
   const orgStyle = await loadOrgDeckStyle(supabase, deck.org_id, deckId);
@@ -108,7 +118,7 @@ export async function fillDeckSlides(deckId: string, userId: string) {
         deckType: deck.type as DeckType,
         projectName: project?.name ?? "Project",
         projectDescription: project?.description,
-        updates: updates ?? {},
+        updates: projectUpdates,
         outlineSlide,
         slideIndex: index,
         totalSlides: outline.slides.length,
@@ -118,6 +128,8 @@ export async function fillDeckSlides(deckId: string, userId: string) {
           layoutHint,
           orgStyle?.hint,
         ].filter(Boolean) as string[],
+        includedSections: contentFocus.includedSections,
+        deckBrief: contentFocus.deckBrief,
       });
 
       const { object, usage } = await generateObject({

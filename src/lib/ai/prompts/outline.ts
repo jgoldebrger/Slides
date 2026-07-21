@@ -1,5 +1,8 @@
 import type { DeckOutline, DeckType } from "@/types/slide";
 import { DECK_TYPE_LABELS } from "@/lib/deck-labels";
+import { deckTypeOutlineHint } from "@/lib/ai/deck-type-hints";
+import { deckBriefPromptBlock } from "@/lib/ai/update-sections";
+import { projectUpdatesPromptRules } from "@/lib/ai/project-updates-context";
 import { aiTonePromptHint, type AiTone } from "@/lib/ai/tone";
 import { audiencePromptHint, type DeckAudience } from "@/lib/ai/audience";
 
@@ -13,6 +16,8 @@ export function buildOutlinePrompt({
   aiTone = "executive",
   audience = "general",
   orgStyleHint,
+  includedSections,
+  deckBrief,
 }: {
   deckType: DeckType;
   projectName: string;
@@ -23,6 +28,8 @@ export function buildOutlinePrompt({
   aiTone?: AiTone;
   audience?: DeckAudience;
   orgStyleHint?: string;
+  includedSections?: import("@/lib/ai/update-sections").ProjectUpdateSectionId[];
+  deckBrief?: string;
 }) {
   const preserveStructure =
     existingOutline?.slides?.length &&
@@ -34,8 +41,14 @@ export function buildOutlinePrompt({
 - Preserve each slide's layout and type; update titles and summaries to reflect new data.
 - Do NOT add slides for new list items — fold new content into the most relevant existing slide.
 - Do NOT remove slides unless the source section was deleted from project data.`
-    : `- Prefer 8-12 slides for status updates.
-- Start with a title slide and end with next steps or Q&A.`;
+    : `- Match this deck type: ${deckTypeOutlineHint(deckType)}
+- Prefer 8-12 slides only when enough project data exists to support them.
+- Start with a title slide; end with next steps only if next_steps data exists.`;
+
+  const dataRules = projectUpdatesPromptRules(updates, {
+    deckType,
+    includedSections,
+  });
 
   const existingOutlineBlock = preserveStructure
     ? `
@@ -61,10 +74,12 @@ Layout guidance:
 Rules:
 - Use ONLY facts from the project data below. Do not invent metrics, dates, or achievements.
 - Each slide needs: title, layout (title|bullets|metrics_grid|timeline|two_column|image_caption|chart|quote|section_break), type, and a one-sentence summary.
+${dataRules}
 ${structureRules}
 
 Project: ${projectName}
 ${projectDescription ? `Description: ${projectDescription}` : ""}
+${deckBriefPromptBlock(deckBrief)}
 
 Project data (JSON):
 ${JSON.stringify(updates, null, 2)}

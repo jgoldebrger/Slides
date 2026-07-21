@@ -4,6 +4,8 @@ import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadOrgAiTone } from "@/lib/ai/load-org-tone";
 import { loadDeckAudience } from "@/lib/ai/load-deck-audience";
+import { contentFocusFromMetadata } from "@/lib/ai/load-deck-content-focus";
+import { prepareProjectUpdatesForDeck } from "@/lib/ai/project-updates-context";
 import { buildSlideFillPrompt } from "@/lib/ai/prompts/slides";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
 import { snapshotDeckSlides } from "@/lib/decks/revisions";
@@ -68,6 +70,14 @@ export async function refreshDeckSlides(
     .eq("project_id", deck.project_id)
     .single();
 
+  const contentFocus = contentFocusFromMetadata(
+    deck.metadata,
+    deck.type as DeckType
+  );
+  const projectUpdates = prepareProjectUpdatesForDeck(
+    updates,
+    contentFocus.includedSections
+  );
   const aiTone = await loadOrgAiTone(supabase, deck.org_id);
   const audience = await loadDeckAudience(supabase, deckId);
 
@@ -131,12 +141,14 @@ export async function refreshDeckSlides(
         deckType: deck.type as DeckType,
         projectName: project?.name ?? "Project",
         projectDescription: project?.description,
-        updates: updates ?? {},
+        updates: projectUpdates,
         outlineSlide,
         slideIndex: index,
         totalSlides: existingSlides.length,
         aiTone,
         audience,
+        includedSections: contentFocus.includedSections,
+        deckBrief: contentFocus.deckBrief,
       });
 
       const { object, usage } = await generateObject({

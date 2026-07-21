@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { captureEvent } from "@/components/analytics/posthog-provider";
@@ -21,8 +22,12 @@ import {
   DECK_AUDIENCE_LABELS,
   type DeckAudience,
 } from "@/lib/ai/audience";
+import { DeckContentFocusPanel } from "@/components/decks/deck-content-focus-panel";
 import { SLIDE_LAYOUTS } from "@/types/slide";
-import type { DeckOutline, OutlineSlide } from "@/types/slide";
+import type { DeckOutline, DeckType, OutlineSlide } from "@/types/slide";
+import type { ProjectUpdateSectionId } from "@/lib/ai/update-sections";
+import { defaultIncludedSectionsForDeckType } from "@/lib/ai/update-sections";
+import type { ProjectUpdatesCoverage } from "@/lib/ai/project-updates-context";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -41,6 +46,13 @@ type OutlineEditorProps = {
   initialOutline: DeckOutline | null;
   deckStatus: string;
   initialAudience?: DeckAudience;
+  deckType?: DeckType;
+  initialIncludedSections?: ProjectUpdateSectionId[];
+  initialDeckBrief?: string;
+  sectionCoverage?: ProjectUpdatesCoverage;
+  projectId?: string;
+  updatesSparse?: boolean;
+  updatesCoverage?: string;
 };
 
 export function OutlineEditor({
@@ -49,6 +61,13 @@ export function OutlineEditor({
   initialOutline,
   deckStatus,
   initialAudience = "general",
+  deckType = "project_status",
+  initialIncludedSections,
+  initialDeckBrief = "",
+  sectionCoverage,
+  projectId,
+  updatesSparse = false,
+  updatesCoverage,
 }: OutlineEditorProps) {
   const router = useRouter();
   const [outline, setOutline] = useState<DeckOutline | null>(initialOutline);
@@ -269,6 +288,42 @@ export function OutlineEditor({
 
   return (
     <div className="space-y-6">
+          {updatesSparse && projectId && (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+        >
+          <p className="font-medium text-amber-900 dark:text-amber-100">
+            Project updates are thin — AI may repeat generic slides.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {updatesCoverage}. Slides are built from your project&apos;s fixed
+            update fields (Goals, Metrics, Risks, etc.); deck type changes which
+            fields are emphasized, not which tabs exist.{" "}
+            <Link
+              href={`/projects/${projectId}/updates`}
+              className="text-link underline-offset-4 hover:underline"
+            >
+              Add update content
+            </Link>{" "}
+            before generating.
+          </p>
+        </div>
+      )}
+
+      <DeckContentFocusPanel
+        deckId={deckId}
+        deckType={deckType}
+        initialSections={
+          initialIncludedSections?.length
+            ? initialIncludedSections
+            : defaultIncludedSectionsForDeckType(deckType)
+        }
+        initialBrief={initialDeckBrief}
+        sectionCoverage={sectionCoverage}
+        disabled={generating}
+      />
+
       <div className="flex flex-wrap items-end gap-4">
         <div className="space-y-2">
           <Label htmlFor="outline-audience">Target audience</Label>

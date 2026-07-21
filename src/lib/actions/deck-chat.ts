@@ -9,6 +9,7 @@ import { loadOrgAiTone } from "@/lib/ai/load-org-tone";
 import { loadDeckAudience } from "@/lib/ai/load-deck-audience";
 import { suggestLayoutForContent } from "@/lib/ai/suggest-layout";
 import { appendDeckChatHistory } from "@/lib/actions/ai-enhancements";
+import { normalizeProjectUpdatesForAi } from "@/lib/ai/project-updates-context";
 import { buildSlideFillPrompt } from "@/lib/ai/prompts/slides";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
 import { assertDeckJobEntitlement } from "@/lib/deck-rate-limit";
@@ -258,7 +259,7 @@ async function executeDeckChatAction({
           deckType: deck.type as import("@/types/slide").DeckType,
           projectName: project?.name ?? "Project",
           projectDescription: project?.description,
-          updates: updates ?? {},
+          updates: normalizeProjectUpdatesForAi(updates ?? {}),
           outlineSlide: {
             title: action.title,
             layout,
