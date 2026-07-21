@@ -17,6 +17,9 @@ import { SlidePreview } from "@/components/slides/slide-preview";
 import { PlayerBackgroundSettings } from "@/components/decks/player-background-settings";
 import {
   buildSlideNarration,
+  loadNarrationPrefs,
+  preferredSpeechVoices,
+  saveNarrationPrefs,
   speakText,
   stopSpeaking,
 } from "@/lib/slides/narration";
@@ -25,6 +28,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 2] as const;
+const PITCH_OPTIONS = [
+  { value: 0.8, label: "Low" },
+  { value: 1, label: "Default" },
+  { value: 1.2, label: "High" },
+] as const;
 const BASE_SLIDE_MS = 4000;
 
 type SlidePlayerProps = {
@@ -56,6 +64,12 @@ export function SlidePlayer({
   const [bgMuted, setBgMuted] = useState(false);
   const [bgVolume, setBgVolume] = useState(0.25);
   const [narrationEnabled, setNarrationEnabled] = useState(!shareMode);
+  const [narrationVoiceURI, setNarrationVoiceURI] = useState<string | null>(
+    null
+  );
+  const [narrationPitch, setNarrationPitch] = useState(1);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [prefsReady, setPrefsReady] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
@@ -63,6 +77,40 @@ export function SlidePlayer({
   const presentationRef = useRef<HTMLDivElement | null>(null);
   const playingRef = useRef(false);
   const indexRef = useRef(0);
+
+  useEffect(() => {
+    const prefs = loadNarrationPrefs(!shareMode);
+    setNarrationEnabled(prefs.enabled);
+    setNarrationVoiceURI(prefs.voiceURI);
+    setNarrationPitch(prefs.pitch);
+    setPrefsReady(true);
+  }, [shareMode]);
+
+  useEffect(() => {
+    if (!prefsReady) return;
+    saveNarrationPrefs({
+      enabled: narrationEnabled,
+      voiceURI: narrationVoiceURI,
+      pitch: narrationPitch,
+    });
+  }, [prefsReady, narrationEnabled, narrationVoiceURI, narrationPitch]);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.speechSynthesis) return;
+
+    function refreshVoices() {
+      setVoices(preferredSpeechVoices());
+    }
+
+    refreshVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", refreshVoices);
+    return () => {
+      window.speechSynthesis.removeEventListener(
+        "voiceschanged",
+        refreshVoices
+      );
+    };
+  }, []);
 
   const current = sorted[index];
   const goTo = useCallback(
@@ -97,13 +145,22 @@ export function SlidePlayer({
     const slide = sorted[indexRef.current];
     speakText(buildSlideNarration(slide), {
       rate: playbackSpeed,
+      pitch: narrationPitch,
+      voiceURI: narrationVoiceURI,
       onEnd: advanceOrStop,
       onError: () => {
         setPlaying(false);
         playingRef.current = false;
       },
     });
-  }, [advanceOrStop, narrationEnabled, playbackSpeed, sorted]);
+  }, [
+    advanceOrStop,
+    narrationEnabled,
+    narrationPitch,
+    narrationVoiceURI,
+    playbackSpeed,
+    sorted,
+  ]);
 
   useEffect(() => {
     playingRef.current = playing;
@@ -119,7 +176,15 @@ export function SlidePlayer({
       cleanup?.();
       stopSpeaking();
     };
-  }, [playing, index, narrationEnabled, playbackSpeed, playCurrentSlide]);
+  }, [
+    playing,
+    index,
+    narrationEnabled,
+    narrationPitch,
+    narrationVoiceURI,
+    playbackSpeed,
+    playCurrentSlide,
+  ]);
 
   useEffect(() => {
     indexRef.current = index;
@@ -455,8 +520,71 @@ export function SlidePlayer({
                     if (!e.target.checked) stopSpeaking();
                   }}
                 />
-                Narration
+                AI reader
               </label>
+
+              {narrationEnabled && (
+                <>
+                  <label
+                    className={cn(
+                      "flex items-center gap-2 text-sm",
+                      isFullscreen && "text-background/90"
+                    )}
+                  >
+                    <span className="hidden sm:inline">Voice</span>
+                    <select
+                      value={narrationVoiceURI ?? ""}
+                      onChange={(e) => {
+                        const next = e.target.value || null;
+                        setNarrationVoiceURI(next);
+                        if (playing) stopSpeaking();
+                      }}
+                      className={cn(
+                        "h-9 max-w-[10rem] rounded-md border border-input bg-background px-2 text-sm sm:max-w-[14rem]",
+                        isFullscreen &&
+                          "border-background/30 bg-background/10 text-background"
+                      )}
+                      aria-label="Narration voice"
+                    >
+                      <option value="">Browser default</option>
+                      {voices.map((voice) => (
+                        <option key={voice.voiceURI} value={voice.voiceURI}>
+                          {voice.name}
+                          {voice.lang ? ` (${voice.lang})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label
+                    className={cn(
+                      "flex items-center gap-2 text-sm",
+                      isFullscreen && "text-background/90"
+                    )}
+                  >
+                    <span className="hidden sm:inline">Pitch</span>
+                    <select
+                      value={narrationPitch}
+                      onChange={(e) => {
+                        setNarrationPitch(Number(e.target.value));
+                        if (playing) stopSpeaking();
+                      }}
+                      className={cn(
+                        "h-9 rounded-md border border-input bg-background px-2 text-sm",
+                        isFullscreen &&
+                          "border-background/30 bg-background/10 text-background"
+                      )}
+                      aria-label="Narration pitch"
+                    >
+                      {PITCH_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </>
+              )}
 
               {backgroundAudioUrl && (
                 <>
