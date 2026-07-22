@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ChevronLeft,
@@ -61,7 +61,10 @@ export function SlidePlayer({
   applyBranding = false,
   brandTheme = null,
 }: SlidePlayerProps) {
-  const sorted = [...slides].sort((a, b) => a.order - b.order);
+  const sorted = useMemo(
+    () => [...slides].sort((a, b) => a.order - b.order),
+    [slides]
+  );
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [bgMuted, setBgMuted] = useState(false);
@@ -191,9 +194,16 @@ export function SlidePlayer({
         narrationObjectUrlRef.current = url;
 
         const audio = narrationAudioRef.current;
-        if (!audio) return;
+        if (!audio) {
+          setNarrationLoading(false);
+          toast.error("Audio player is not ready. Try play again.");
+          setPlaying(false);
+          playingRef.current = false;
+          return;
+        }
 
         audio.src = url;
+        audio.playbackRate = 1;
         audio.onended = () => advanceOrStop();
         audio.onerror = () => {
           toast.error("AI voice playback failed");
@@ -201,7 +211,13 @@ export function SlidePlayer({
           playingRef.current = false;
         };
         setNarrationLoading(false);
-        await audio.play();
+        try {
+          await audio.play();
+        } catch {
+          toast.error("Could not play audio. Click play again.");
+          setPlaying(false);
+          playingRef.current = false;
+        }
       } catch (err) {
         if (abort.signal.aborted) return;
         setNarrationLoading(false);
