@@ -45,12 +45,23 @@ export async function listAiAddons(cluster?: AiAddonCluster) {
   const items = cluster ? addonsByCluster(cluster) : AI_ADDON_CATALOG;
   const { supabase, orgId } = await getUserOrg();
   const prefs = await loadOrgAiPrefs(supabase, orgId);
-  return {
-    addons: items,
-    top12: TOP_12_ADDON_IDS,
-    enabled: items.filter((a) =>
-      isAiAddonEnabled(a.id as AiAddonFeatureId, prefs.featureOverrides ?? null)
+  const overrides = prefs.featureOverrides ?? null;
+  const addons = items.map((addon) => ({
+    ...addon,
+    enabled: isAiAddonEnabled(
+      addon.id as AiAddonFeatureId,
+      overrides
     ),
+    orgOverride: overrides != null && addon.id in overrides,
+  }));
+  return {
+    addons,
+    top12: TOP_12_ADDON_IDS,
+    enabled: addons.filter((a) => a.enabled),
+    stats: {
+      enabled: addons.filter((a) => a.enabled).length,
+      total: addons.length,
+    },
   };
 }
 
