@@ -81,9 +81,89 @@ export function SlidePlayer({
   const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
   const narrationObjectUrlRef = useRef<string | null>(null);
   const narrateAbortRef = useRef<AbortController | null>(null);
+  const narrationCacheRef = useRef<Map<string, Blob>>(new Map());
+  const narrationInflightRef = useRef<Map<string, Promise<Blob>>>(new Map());
   const presentationRef = useRef<HTMLDivElement | null>(null);
   const playingRef = useRef(false);
   const indexRef = useRef(0);
+
+  const narrationCacheKey = useCallback(
+    (slideId: string) => `${slideId}:${narrationVoice}:${playbackSpeed}`,
+    [narrationVoice, playbackSpeed]
+  );
+
+  const fetchNarrationBlob = useCallback(
+    async (slideId: string, signal?: AbortSignal): Promise<Blob> => {
+      const key = narrationCacheKey(slideId);
+      const cached = narrationCacheRef.current.get(key);
+      if (cached) return cached;
+
+      const inflight = narrationInflightRef.current.get(key);
+      if (inflight) {
+        const blob = await inflight;
+        if (signal?.aborted) {
+          throw new DOMException("Aborted", "AbortError");
+        }
+        return blob;
+      }
+
+      const promise = (async () => {
+        const res = await fetch(`/api/decks/${deckId}/narrate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slideId,
+            voice: narrationVoice,
+            speed: playbackSpeed,
+            ...(shareToken ? { shareToken } : {}),
+          }),
+          signal,
+        });
+
+        if (!res.ok) {
+          let message = "Could not generate AI voice";
+          try {
+            const body = (await res.json()) as {
+              error?: { message?: string };
+            };
+            if (body.error?.message) message = body.error.message;
+          } catch {
+            // ignore
+          }
+          throw new Error(message);
+        }
+
+        const blob = await res.blob();
+        narrationCacheRef.current.set(key, blob);
+        return blob;
+      })();
+
+      narrationInflightRef.current.set(key, promise);
+      try {
+        return await promise;
+      } finally {
+        narrationInflightRef.current.delete(key);
+      }
+    },
+    [deckId, narrationCacheKey, narrationVoice, playbackSpeed, shareToken]
+  );
+
+  const prefetchNarration = useCallback(
+    (slideIndex: number) => {
+      if (!narrationEnabled) return;
+      const slide = sorted[slideIndex];
+      if (!slide) return;
+      const key = narrationCacheKey(slide.id);
+      if (
+        narrationCacheRef.current.has(key) ||
+        narrationInflightRef.current.has(key)
+      ) {
+        return;
+      }
+      void fetchNarrationBlob(slide.id).catch(() => undefined);
+    },
+    [fetchNarrationBlob, narrationCacheKey, narrationEnabled, sorted]
+  );
 
   const stopNarrationAudio = useCallback(() => {
     narrateAbortRef.current?.abort();
@@ -110,6 +190,17 @@ export function SlidePlayer({
   }, [shareMode]);
 
   useEffect(() => {
+    narrationCacheRef.current.clear();
+    narrationInflightRef.current.clear();
+  }, [narrationVoice, playbackSpeed]);
+
+  useEffect(() => {
+    if (!prefsReady || !narrationEnabled || sorted.length === 0) return;
+    prefetchNarration(index);
+    prefetchNarration(index + 1);
+  }, [prefsReady, narrationEnabled, sorted.length, index, prefetchNarration]);
+
+  useEffect(() => {
     if (!prefsReady) return;
     saveNarrationPrefs({
       enabled: narrationEnabled,
@@ -117,7 +208,6 @@ export function SlidePlayer({
     });
   }, [prefsReady, narrationEnabled, narrationVoice]);
 
-  const current = sorted[index];
   const goTo = useCallback(
     (next: number) => {
       stopNarrationAudio();
@@ -138,6 +228,46 @@ export function SlidePlayer({
     }
   }, [goTo, sorted.length]);
 
+  const playNarrationBlob = useCallback(
+    async (blob: Blob, abort: AbortSignal) => {
+      if (abort.aborted || !playingRef.current) return;
+
+      if (narrationObjectUrlRef.current) {
+        URL.revokeObjectURL(narrationObjectUrlRef.current);
+      }
+      const url = URL.createObjectURL(blob);
+      narrationObjectUrlRef.current = url;
+
+      const audio = narrationAudioRef.current;
+      if (!audio) {
+        setNarrationLoading(false);
+        toast.error("Audio player is not ready. Try play again.");
+        setPlaying(false);
+        playingRef.current = false;
+        return;
+      }
+
+      audio.src = url;
+      audio.playbackRate = 1;
+      audio.onended = () => advanceOrStop();
+      audio.onerror = () => {
+        toast.error("AI voice playback failed");
+        setPlaying(false);
+        playingRef.current = false;
+      };
+      setNarrationLoading(false);
+      try {
+        await audio.play();
+        prefetchNarration(indexRef.current + 1);
+      } catch {
+        toast.error("Could not play audio. Click play again.");
+        setPlaying(false);
+        playingRef.current = false;
+      }
+    },
+    [advanceOrStop, prefetchNarration]
+  );
+
   const playCurrentSlide = useCallback(() => {
     if (!playingRef.current) return () => undefined;
 
@@ -155,69 +285,15 @@ export function SlidePlayer({
 
     const abort = new AbortController();
     narrateAbortRef.current = abort;
-    setNarrationLoading(true);
+    const cacheKey = narrationCacheKey(slide.id);
+    const cached = narrationCacheRef.current.get(cacheKey);
+    setNarrationLoading(!cached);
 
     void (async () => {
       try {
-        const res = await fetch(`/api/decks/${deckId}/narrate`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            slideId: slide.id,
-            voice: narrationVoice,
-            speed: playbackSpeed,
-            ...(shareToken ? { shareToken } : {}),
-          }),
-          signal: abort.signal,
-        });
-
-        if (!res.ok) {
-          let message = "Could not generate AI voice";
-          try {
-            const body = (await res.json()) as {
-              error?: { message?: string };
-            };
-            if (body.error?.message) message = body.error.message;
-          } catch {
-            // ignore
-          }
-          throw new Error(message);
-        }
-
-        const blob = await res.blob();
-        if (abort.signal.aborted || !playingRef.current) return;
-
-        if (narrationObjectUrlRef.current) {
-          URL.revokeObjectURL(narrationObjectUrlRef.current);
-        }
-        const url = URL.createObjectURL(blob);
-        narrationObjectUrlRef.current = url;
-
-        const audio = narrationAudioRef.current;
-        if (!audio) {
-          setNarrationLoading(false);
-          toast.error("Audio player is not ready. Try play again.");
-          setPlaying(false);
-          playingRef.current = false;
-          return;
-        }
-
-        audio.src = url;
-        audio.playbackRate = 1;
-        audio.onended = () => advanceOrStop();
-        audio.onerror = () => {
-          toast.error("AI voice playback failed");
-          setPlaying(false);
-          playingRef.current = false;
-        };
-        setNarrationLoading(false);
-        try {
-          await audio.play();
-        } catch {
-          toast.error("Could not play audio. Click play again.");
-          setPlaying(false);
-          playingRef.current = false;
-        }
+        const blob = cached ?? (await fetchNarrationBlob(slide.id, abort.signal));
+        await playNarrationBlob(blob, abort.signal);
+        prefetchNarration(indexRef.current + 2);
       } catch (err) {
         if (abort.signal.aborted) return;
         setNarrationLoading(false);
@@ -235,14 +311,17 @@ export function SlidePlayer({
     };
   }, [
     advanceOrStop,
-    deckId,
+    fetchNarrationBlob,
+    narrationCacheKey,
     narrationEnabled,
-    narrationVoice,
     playbackSpeed,
-    shareToken,
+    playNarrationBlob,
+    prefetchNarration,
     sorted,
     stopNarrationAudio,
   ]);
+
+  const current = sorted[index];
 
   useEffect(() => {
     playingRef.current = playing;
