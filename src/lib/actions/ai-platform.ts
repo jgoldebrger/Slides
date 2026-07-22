@@ -53,15 +53,23 @@ export async function getOrgProjectsForPortfolio() {
 }
 
 export async function updateOrgAiPrefsFromNaturalLanguage(instruction: string) {
+  const trimmed = instruction.trim();
+  if (!trimmed) {
+    return actionError("Enter AI preferences before saving.");
+  }
+
   const { supabase, orgId } = await requireOrgAdmin();
   try {
-    assertUserTextSafe(instruction);
+    assertUserTextSafe(trimmed);
     const existing = await loadOrgAiPrefs(supabase, orgId);
-    const merged = await parseNaturalLanguageAiPrefs(instruction, existing);
+    const merged = await parseNaturalLanguageAiPrefs(trimmed, existing);
     await saveOrgAiPrefs(supabase, orgId, merged);
     revalidatePath("/settings");
     return { success: true as const, prefs: merged };
   } catch (err) {
-    return actionError(toPublicError(err, "Failed to parse AI preferences"));
+    if (err instanceof Error && err.message.includes("permission")) {
+      return actionError("You do not have permission to update org AI settings.");
+    }
+    return actionError(toPublicError(err, "Failed to save AI preferences"));
   }
 }

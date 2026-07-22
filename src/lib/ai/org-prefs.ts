@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import type { AiFeatureId } from "@/lib/ai/feature-flags";
+import { PublicError } from "@/lib/errors/public-error";
 
 export const orgAiPrefsSchema = z.object({
   preferChartsOverTables: z.boolean().optional(),
@@ -41,17 +42,25 @@ export async function saveOrgAiPrefs(
   orgId: string,
   prefs: OrgAiPrefs
 ): Promise<void> {
-  const { data } = await supabase
+  const { data, error: readError } = await supabase
     .from("organizations")
     .select("settings")
     .eq("id", orgId)
     .single();
 
-  const current = parseOrgSettings(data?.settings);
+  if (readError) throw new Error(readError.message);
+
+  const rawSettings =
+    data?.settings &&
+    typeof data.settings === "object" &&
+    !Array.isArray(data.settings)
+      ? (data.settings as Record<string, unknown>)
+      : {};
+
   const { error } = await supabase
     .from("organizations")
     .update({
-      settings: { ...current, aiPrefs: prefs },
+      settings: { ...rawSettings, aiPrefs: prefs },
       updated_at: new Date().toISOString(),
     })
     .eq("id", orgId);
@@ -64,37 +73,71 @@ const nlPrefsSchema = z.object({
   defaultBrevity: z.enum(["concise", "balanced", "detailed"]).optional(),
   requireHitlForNewMetrics: z.boolean().optional(),
   requireHitlForNewRisks: z.boolean().optional(),
-  summary: z.string(),
+  summary: z.string().optional(),
 });
+
+function inferPrefsFromInstruction(
+  instruction: string,
+  existing: OrgAiPrefs
+): OrgAiPrefs {
+  const lower = instruction.toLowerCase();
+  const preferChartsOverTables =
+    /chart|visual|graph/.test(lower) && !/table/.test(lower)
+      ? true
+      : existing.preferChartsOverTables;
+
+  let defaultBrevity = existing.defaultBrevity;
+  if (/concise|brief|short|fewer slide|less slide|clear/.test(lower)) {
+    defaultBrevity = "concise";
+  } else if (/detailed|thorough|comprehensive/.test(lower)) {
+    defaultBrevity = "detailed";
+  }
+
+  return {
+    ...existing,
+    preferChartsOverTables,
+    defaultBrevity,
+    naturalLanguageNotes: instruction,
+  };
+}
 
 export async function parseNaturalLanguageAiPrefs(
   instruction: string,
   existing: OrgAiPrefs = {}
 ): Promise<OrgAiPrefs> {
-  if (!process.env.OPENAI_API_KEY) {
-    return {
-      ...existing,
-      naturalLanguageNotes: instruction.trim(),
-    };
+  const trimmed = instruction.trim();
+  if (!trimmed) {
+    throw new PublicError("Enter AI preferences before saving.");
   }
 
-  const { object } = await generateObject({
-    model: openai("gpt-4o-mini"),
-    schema: nlPrefsSchema,
-    prompt: `Parse this natural-language AI preference instruction for a slide deck SaaS. Merge with existing prefs. Instruction: ${instruction}`,
-  });
+  if (!process.env.OPENAI_API_KEY) {
+    return inferPrefsFromInstruction(trimmed, existing);
+  }
 
-  return {
-    ...existing,
-    preferChartsOverTables:
-      object.preferChartsOverTables ?? existing.preferChartsOverTables,
-    defaultBrevity: object.defaultBrevity ?? existing.defaultBrevity,
-    requireHitlForNewMetrics:
-      object.requireHitlForNewMetrics ?? existing.requireHitlForNewMetrics,
-    requireHitlForNewRisks:
-      object.requireHitlForNewRisks ?? existing.requireHitlForNewRisks,
-    naturalLanguageNotes: object.summary,
-  };
+  try {
+    const { object } = await generateObject({
+      model: openai("gpt-4o-mini"),
+      schema: nlPrefsSchema,
+      prompt: `Parse this natural-language AI preference instruction for a slide deck SaaS. Merge with existing prefs. Instruction: ${trimmed}`,
+    });
+
+    return {
+      ...existing,
+      preferChartsOverTables:
+        object.preferChartsOverTables ?? existing.preferChartsOverTables,
+      defaultBrevity: object.defaultBrevity ?? existing.defaultBrevity,
+      requireHitlForNewMetrics:
+        object.requireHitlForNewMetrics ?? existing.requireHitlForNewMetrics,
+      requireHitlForNewRisks:
+        object.requireHitlForNewRisks ?? existing.requireHitlForNewRisks,
+      naturalLanguageNotes: object.summary?.trim() || trimmed,
+    };
+  } catch (err) {
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[org-prefs] NL parse fallback:", err);
+    }
+    return inferPrefsFromInstruction(trimmed, existing);
+  }
 }
 
 export function isFeatureEnabledForOrg(

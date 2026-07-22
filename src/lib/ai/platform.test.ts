@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { estimatePaceScore } from "@/lib/ai/present";
 import { explainLayoutChoice } from "@/lib/ai/editor";
-import { parseOrgSettings } from "@/lib/ai/org-prefs";
+import { parseOrgSettings, parseNaturalLanguageAiPrefs } from "@/lib/ai/org-prefs";
 
 describe("present helpers", () => {
   it("estimates pace from slides", () => {
@@ -23,5 +23,17 @@ describe("editor helpers", () => {
 describe("org prefs", () => {
   it("parses empty settings", () => {
     expect(parseOrgSettings({}).aiPrefs).toEqual({});
+  });
+
+  it("falls back to keyword inference without OpenAI", async () => {
+    const prev = process.env.OPENAI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    const prefs = await parseNaturalLanguageAiPrefs(
+      "Make it always very clear and fewer slides, adding visuals"
+    );
+    if (prev) process.env.OPENAI_API_KEY = prev;
+    expect(prefs.naturalLanguageNotes).toContain("fewer slides");
+    expect(prefs.defaultBrevity).toBe("concise");
+    expect(prefs.preferChartsOverTables).toBe(true);
   });
 });
