@@ -7,9 +7,12 @@ import { loadDeckAudience } from "@/lib/ai/load-deck-audience";
 import { loadOrgDeckStyle } from "@/lib/ai/load-org-deck-style";
 import { layoutSuggestionHint } from "@/lib/ai/suggest-layout";
 import { contentFocusFromMetadata } from "@/lib/ai/load-deck-content-focus";
+import { analyzeProjectUpdates } from "@/lib/ai/analyze-project-updates";
 import { prepareProjectUpdatesForDeck } from "@/lib/ai/project-updates-context";
 import { buildSlideFillPrompt } from "@/lib/ai/prompts/slides";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
+import { logAiActivity } from "@/lib/ai/activity";
+import { inferConfidenceFromCitations } from "@/lib/ai/confidence";
 import { replaceDeckSlidesAtomic } from "@/lib/decks/slide-mutations";
 import { resolveChartData } from "@/lib/slides/metrics-to-chart";
 import type { DeckOutline, DeckType } from "@/types/slide";
@@ -50,12 +53,14 @@ export async function fillDeckSlides(deckId: string, userId: string) {
 
   const contentFocus = contentFocusFromMetadata(
     deck.metadata,
-    deck.type as DeckType
+    deck.type as DeckType,
+    updates
   );
   const projectUpdates = prepareProjectUpdatesForDeck(
     updates,
     contentFocus.includedSections
   );
+  const contentAnalysis = analyzeProjectUpdates(projectUpdates);
   const aiTone = await loadOrgAiTone(supabase, deck.org_id);
   const audience = await loadDeckAudience(supabase, deckId);
   const orgStyle = await loadOrgDeckStyle(supabase, deck.org_id, deckId);
@@ -130,6 +135,7 @@ export async function fillDeckSlides(deckId: string, userId: string) {
         ].filter(Boolean) as string[],
         includedSections: contentFocus.includedSections,
         deckBrief: contentFocus.deckBrief,
+        contentAnalysis,
       });
 
       const { object, usage } = await generateObject({
@@ -174,14 +180,29 @@ export async function fillDeckSlides(deckId: string, userId: string) {
     });
 
     if (genLog?.id) {
+      const confidence = inferConfidenceFromCitations(
+        slides.length,
+        Math.max(slides.length, 1)
+      );
       await supabase
         .from("ai_generations")
         .update({
           status: "completed",
           tokens: totalTokens,
+          confidence,
         })
         .eq("id", genLog.id);
     }
+
+    await logAiActivity(supabase, {
+      orgId: deck.org_id,
+      deckId,
+      userId,
+      action: "slides.fill",
+      featureId: "gen_brief_wizard",
+      summary: `Filled ${slides.length} slides from outline`,
+      metadata: { slideCount: slides.length },
+    });
 
     return { success: true, slideCount: slides.length };
   } catch (err) {

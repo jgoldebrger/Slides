@@ -16,7 +16,13 @@
 
 **Code:** `src/lib/ai/`
 
-**Usage logging:** `ai_generations` table (model, tokens, prompt_hash, status)
+**Usage logging:** `ai_generations` table (model, tokens, prompt_hash, status, `confidence`, `citations`)
+
+**AI platform (Wave 0):** `organizations.settings.aiPrefs`, append-only `ai_activity` timeline, feature flags (`src/lib/ai/feature-flags.ts`, env `AI_FEATURE_*`), citations/confidence helpers (`src/lib/ai/citations.ts`, `confidence.ts`), org prefs + NL parser (`src/lib/ai/org-prefs.ts`), HITL gates (`src/lib/ai/hitl.ts`). Server actions: `src/lib/actions/ai-platform.ts`, `src/lib/actions/ai-features.ts`. UI: deck AI panel hub, outline tools, player tools, project intake, settings.
+
+**Workstream libs:** `src/lib/ai/intake/`, `generation/`, `editor/`, `present/`, `org-memory/` — 50 feature IDs behind org/env flags.
+
+**100 net-new add-ons (clusters G–O):** `src/lib/ai/addons/` (catalog + cluster libs), flags in `src/lib/ai/addon-flags.ts` (env `AI_ADDON_*`), actions `src/lib/actions/ai-addons.ts`, UI `AiAddonsHub` on deck AI panel, project updates, and settings.
 
 **TTS (player AI reader):** OpenAI `tts-1` via `POST /api/decks/[id]/narrate`. Voices: alloy, echo, fable, onyx, nova, shimmer. Audio is cached under `slide-assets/{org}/{deck}/tts/`.
 

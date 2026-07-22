@@ -4,6 +4,7 @@ import { loadOrgAiTone } from "@/lib/ai/load-org-tone";
 import { loadDeckAudience } from "@/lib/ai/load-deck-audience";
 import { loadOrgDeckStyle } from "@/lib/ai/load-org-deck-style";
 import { contentFocusFromMetadata } from "@/lib/ai/load-deck-content-focus";
+import { assertProjectContentForGeneration } from "@/lib/ai/no-project-content-error";
 import { prepareProjectUpdatesForDeck } from "@/lib/ai/project-updates-context";
 import { buildOutlinePrompt } from "@/lib/ai/prompts/outline";
 import type { DeckOutline, DeckType } from "@/types/slide";
@@ -45,12 +46,14 @@ export async function buildOutlineStreamContext(deckId: string) {
   const orgStyle = await loadOrgDeckStyle(supabase, deck.org_id, deckId);
   const contentFocus = contentFocusFromMetadata(
     deck.metadata,
-    deck.type as DeckType
+    deck.type as DeckType,
+    updates
   );
   const projectUpdates = prepareProjectUpdatesForDeck(
     updates,
     contentFocus.includedSections
   );
+  const contentAnalysis = assertProjectContentForGeneration(projectUpdates);
 
   const prompt = buildOutlinePrompt({
     deckType: deck.type as DeckType,
@@ -64,6 +67,7 @@ export async function buildOutlineStreamContext(deckId: string) {
     orgStyleHint: orgStyle?.hint,
     includedSections: contentFocus.includedSections,
     deckBrief: contentFocus.deckBrief,
+    contentAnalysis,
   });
 
   return { supabase, deck, prompt };

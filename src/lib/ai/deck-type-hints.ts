@@ -13,7 +13,7 @@ type UpdateSection =
 
 export type SectionCoverage = Record<UpdateSection, boolean>;
 
-/** Which project-update tabs/fields each deck type should emphasize. */
+/** Which project-update fields each deck type emphasizes for content-focus presets. */
 export const DECK_TYPE_SECTION_FOCUS: Record<
   DeckType,
   { primary: UpdateSection[]; combine: UpdateSection[] }
@@ -52,37 +52,23 @@ export const DECK_TYPE_SECTION_FOCUS: Record<
   },
 };
 
-/** Per-type outline guidance so decks don't all look identical. */
-export const DECK_TYPE_OUTLINE_HINTS: Record<DeckType, string> = {
-  project_status:
-    "Balanced status deck: progress, completed work, metrics (if data exists), risks/blockers, next steps.",
-  executive_update:
-    "Short and decision-focused (4-6 slides): headline progress, key metrics, top risks — combine other fields instead of dedicated slides.",
-  weekly_report:
-    "Recurring cadence (4-7 slides): what changed this week, tasks in flight, blockers, next week.",
-  rollout_plan:
-    "Phased delivery (5-8 slides): timeline/milestones, workstreams, dependencies, rollout risks.",
-  project_kickoff:
-    "Kickoff (5-8 slides): goals, scope/context, milestones, team/tasks, success metrics.",
-  client_presentation:
-    "Client-facing (5-8 slides): outcomes and value, progress highlights, risks with mitigations.",
+/** Soft framing only — no slide topics or counts. */
+export const DECK_TYPE_FRAMING_HINTS: Record<DeckType, string> = {
+  project_status: "Balanced status framing across available facts.",
+  executive_update: "Prefer brevity and decision-ready framing.",
+  weekly_report: "Emphasize what changed recently and what is next.",
+  rollout_plan: "Emphasize phases, dependencies, and delivery timing.",
+  project_kickoff: "Emphasize scope, goals, and early milestones.",
+  client_presentation: "Emphasize outcomes and value; avoid internal jargon.",
 };
 
-export function deckTypeOutlineHint(deckType: DeckType): string {
-  return DECK_TYPE_OUTLINE_HINTS[deckType];
+/** @deprecated Use deckTypeFramingHint — kept for callers migrating off slide templates. */
+export const DECK_TYPE_OUTLINE_HINTS = DECK_TYPE_FRAMING_HINTS;
+
+export function deckTypeFramingHint(deckType: DeckType): string {
+  return DECK_TYPE_FRAMING_HINTS[deckType];
 }
 
-export function deckTypeSectionGuidance(
-  deckType: DeckType,
-  coverage: SectionCoverage
-): string {
-  const { primary, combine } = DECK_TYPE_SECTION_FOCUS[deckType];
-  const primaryFilled = primary.filter((key) => coverage[key]);
-  const combineFilled = combine.filter((key) => coverage[key]);
-
-  return `Project updates use fixed sections (the Goals / Metrics / Risks tabs) — do NOT create one slide per tab.
-For this deck type:
-- Prefer slides from: ${primaryFilled.length ? primaryFilled.join(", ") : primary.join(", ")}
-- Fold these into existing slides instead of new ones unless content is heavy: ${combineFilled.length ? combineFilled.join(", ") : combine.join(", ")}
-- Multiple sections may share one slide (e.g. risks + blockers, goals + milestones).`;
+export function deckTypeOutlineHint(deckType: DeckType): string {
+  return deckTypeFramingHint(deckType);
 }

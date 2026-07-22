@@ -4,7 +4,9 @@ import {
   isProjectUpdatesSparse,
   normalizeProjectUpdatesForAi,
   projectUpdatesPromptRules,
+  defaultIncludedSectionsForProject,
 } from "@/lib/ai/project-updates-context";
+import { PROJECT_UPDATE_SECTION_IDS } from "@/lib/ai/update-sections";
 
 describe("project-updates-context", () => {
   it("normalizes empty arrays away", () => {
@@ -28,6 +30,22 @@ describe("project-updates-context", () => {
   it("forbids placeholder language in prompt rules", () => {
     const rules = projectUpdatesPromptRules({});
     expect(rules).toContain("not provided");
-    expect(rules).toContain("minimal outline");
+    expect(rules).not.toContain("minimal outline");
+    expect(rules).not.toContain("Prefer slides from");
+  });
+
+  it("scopes included sections without slide templates", () => {
+    const rules = projectUpdatesPromptRules(
+      { progress: "On track" },
+      { includedSections: ["progress", "metrics"] }
+    );
+    expect(rules).toContain("Facts available for this deck are limited to");
+    expect(rules).not.toContain("title slide");
+  });
+
+  it("defaults to all sections when project has no data", () => {
+    expect(defaultIncludedSectionsForProject({})).toEqual(
+      PROJECT_UPDATE_SECTION_IDS
+    );
   });
 });

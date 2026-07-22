@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { ErrorState } from "@/components/shared/state";
 
 export default function DashboardError({
   error,
@@ -10,12 +10,10 @@ export default function DashboardError({
   reset: () => void;
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-6 text-center">
-      <h2 className="text-lg font-semibold">Something went wrong</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
-      <Button className="mt-4" onClick={reset}>
-        Try again
-      </Button>
-    </div>
+    <ErrorState
+      title="Something went wrong"
+      message={error.message}
+      retry={reset}
+    />
   );
 }

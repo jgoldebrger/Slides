@@ -29,6 +29,7 @@ import {
 } from "@/lib/slides/narration";
 import type { Slide } from "@/types/slide";
 import { Button } from "@/components/ui/button";
+import { AiPresentPanel } from "@/components/decks/ai-present-panel";
 import { cn } from "@/lib/utils";
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 2] as const;
@@ -712,6 +713,10 @@ export function SlidePlayer({
           </p>
           <p className="mt-1 line-clamp-3">{buildSlideNarration(current)}</p>
         </div>
+      )}
+
+      {!isFullscreen && !shareMode && (
+        <AiPresentPanel deckId={deckId} slideIndex={index} />
       )}
 
       {!isFullscreen && (

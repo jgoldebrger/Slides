@@ -285,6 +285,7 @@ export function SlideEditor({
         />
         <DeckAiPanel
           deckId={deckId}
+          slideId={selectedSlide?.id}
           initialAudience={initialAudience}
           initialQa={initialQa}
           initialAutoRefreshWeekly={initialAutoRefreshWeekly}

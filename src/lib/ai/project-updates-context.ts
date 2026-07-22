@@ -1,11 +1,8 @@
 import type { ProjectUpdateInput } from "@/lib/validations";
-import type { DeckType } from "@/types/slide";
-import {
-  deckTypeSectionGuidance,
-} from "@/lib/ai/deck-type-hints";
 import {
   filterUpdatesBySections,
   includedSectionsPromptRules,
+  PROJECT_UPDATE_SECTION_IDS,
   type ProjectUpdateSectionId,
 } from "@/lib/ai/update-sections";
 
@@ -42,8 +39,10 @@ function hasListItems(value: unknown): boolean {
     Array.isArray(value) &&
     value.some((item) => {
       if (typeof item === "string") return item.trim().length > 0;
-      if (item && typeof item === "object" && "title" in item) {
-        return String((item as { title?: string }).title ?? "").trim().length > 0;
+      if (item && typeof item === "object") {
+        const record = item as { title?: string; label?: string };
+        const text = record.title ?? record.label ?? "";
+        return String(text).trim().length > 0;
       }
       return false;
     })
@@ -115,6 +114,22 @@ export function describeProjectUpdatesCoverage(
   return `Sections with data: ${filled.join(", ")}.`;
 }
 
+/** Section IDs that have substantive content in project updates. */
+export function sectionsWithData(
+  updates: Record<string, unknown> | null | undefined
+): ProjectUpdateSectionId[] {
+  const coverage = getProjectUpdatesCoverage(updates);
+  return PROJECT_UPDATE_SECTION_IDS.filter((id) => coverage[id]);
+}
+
+/** Default included sections: all sections with data, or all section IDs when empty. */
+export function defaultIncludedSectionsForProject(
+  updates: Record<string, unknown> | null | undefined
+): ProjectUpdateSectionId[] {
+  const withData = sectionsWithData(updates);
+  return withData.length > 0 ? withData : [...PROJECT_UPDATE_SECTION_IDS];
+}
+
 export function prepareProjectUpdatesForDeck(
   rawUpdates: Record<string, unknown> | null | undefined,
   includedSections: ProjectUpdateSectionId[]
@@ -128,48 +143,23 @@ export function prepareProjectUpdatesForDeck(
 export function projectUpdatesPromptRules(
   updates: Record<string, unknown> | null | undefined,
   options?: {
-    deckType?: DeckType;
     includedSections?: ProjectUpdateSectionId[];
   }
 ): string {
   const coverage = getProjectUpdatesCoverage(updates);
-  const filledCount = countFilledUpdateSections(coverage);
   const coverageLine = describeProjectUpdatesCoverage(coverage);
 
   if (options?.includedSections?.length) {
     const sectionRules = includedSectionsPromptRules(options.includedSections);
-    const base =
-      filledCount === 0
-        ? `${coverageLine}\n- Selected sections have no content yet — use a minimal outline only.`
-        : `${coverageLine}\n${sectionRules}`;
-    return `${base}
+    return `${coverageLine}
+${sectionRules}
 - Do NOT use placeholder text ("not provided", "N/A", "no data", "TBD").`;
   }
 
-  const sectionGuidance = options?.deckType
-    ? deckTypeSectionGuidance(options.deckType, coverage)
-    : "";
-
-  if (filledCount === 0) {
-    return `${coverageLine}
-${sectionGuidance}
-- Project updates are empty — return a minimal outline only (title slide + optional "add your project updates" placeholder slide).
-- Do NOT invent goals, metrics, risks, or dates.
-- Do NOT use phrases like "not provided", "N/A", "no data", or "TBD" on slide titles or summaries.`;
-  }
-
-  if (filledCount < 3) {
-    return `${coverageLine}
-${sectionGuidance}
-- Only create slides for sections that have data above. Prefer ${Math.min(filledCount + 1, 6)} slides total, not a full 8-12 deck.
-- Skip metrics, risks, timeline, and chart slides unless that section has real data.
-- Do NOT use placeholder text ("not provided", "N/A", "no data", "TBD") — omit empty sections entirely.`;
-  }
-
   return `${coverageLine}
-${sectionGuidance}
-- Create slides only for sections with data; do not add filler slides for missing sections.
-- Never write "not provided", "N/A", "no data", or similar placeholders on slides.`;
+- Use only facts present in the project data below.
+- Do not add filler slides for missing sections.
+- Do NOT use placeholder text ("not provided", "N/A", "no data", "TBD").`;
 }
 
 export type { ProjectUpdateInput };

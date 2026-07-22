@@ -1,9 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { DeckType } from "@/types/slide";
-import {
-  defaultIncludedSectionsForDeckType,
-  type ProjectUpdateSectionId,
-} from "@/lib/ai/update-sections";
+import type { ProjectUpdateSectionId } from "@/lib/ai/update-sections";
+import { defaultIncludedSectionsForProject } from "@/lib/ai/project-updates-context";
 import { parseDeckMetadata } from "@/lib/validations/deck-metadata";
 
 export type DeckContentFocus = {
@@ -14,7 +11,7 @@ export type DeckContentFocus = {
 export async function loadDeckContentFocus(
   supabase: SupabaseClient,
   deckId: string,
-  deckType: DeckType
+  updates?: Record<string, unknown> | null
 ): Promise<DeckContentFocus> {
   const { data } = await supabase
     .from("decks")
@@ -26,20 +23,21 @@ export async function loadDeckContentFocus(
   return {
     includedSections:
       (metadata.includedSections as ProjectUpdateSectionId[] | undefined) ??
-      defaultIncludedSectionsForDeckType(deckType),
+      defaultIncludedSectionsForProject(updates),
     deckBrief: metadata.deckBrief ?? "",
   };
 }
 
 export function contentFocusFromMetadata(
   metadata: unknown,
-  deckType: DeckType
+  _deckType?: import("@/types/slide").DeckType,
+  updates?: Record<string, unknown> | null
 ): DeckContentFocus {
   const parsed = parseDeckMetadata(metadata);
   return {
     includedSections:
       (parsed.includedSections as ProjectUpdateSectionId[] | undefined) ??
-      defaultIncludedSectionsForDeckType(deckType),
+      defaultIncludedSectionsForProject(updates),
     deckBrief: parsed.deckBrief ?? "",
   };
 }

@@ -23,11 +23,13 @@ import {
   type DeckAudience,
 } from "@/lib/ai/audience";
 import { DeckContentFocusPanel } from "@/components/decks/deck-content-focus-panel";
+import { AiOutlineTools } from "@/components/decks/ai-outline-tools";
 import { SLIDE_LAYOUTS } from "@/types/slide";
 import type { DeckOutline, DeckType, OutlineSlide } from "@/types/slide";
 import type { ProjectUpdateSectionId } from "@/lib/ai/update-sections";
-import { defaultIncludedSectionsForDeckType } from "@/lib/ai/update-sections";
+import { PROJECT_UPDATE_SECTION_IDS } from "@/lib/ai/update-sections";
 import type { ProjectUpdatesCoverage } from "@/lib/ai/project-updates-context";
+import { NO_PROJECT_CONTENT_MESSAGE } from "@/lib/ai/no-project-content-error";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -50,7 +52,9 @@ type OutlineEditorProps = {
   initialIncludedSections?: ProjectUpdateSectionId[];
   initialDeckBrief?: string;
   sectionCoverage?: ProjectUpdatesCoverage;
+  sectionsWithData?: ProjectUpdateSectionId[];
   projectId?: string;
+  updatesEmpty?: boolean;
   updatesSparse?: boolean;
   updatesCoverage?: string;
 };
@@ -65,7 +69,9 @@ export function OutlineEditor({
   initialIncludedSections,
   initialDeckBrief = "",
   sectionCoverage,
+  sectionsWithData,
   projectId,
+  updatesEmpty = false,
   updatesSparse = false,
   updatesCoverage,
 }: OutlineEditorProps) {
@@ -144,6 +150,8 @@ export function OutlineEditor({
     await runGenerate();
   }
 
+  const canGenerate = !updatesEmpty;
+
   async function runGenerate(useStream = true) {
     setConfirmRegenerateOpen(false);
     setGenerating(true);
@@ -155,7 +163,12 @@ export function OutlineEditor({
           method: "POST",
         });
         if (!res.ok || !res.body) {
-          throw new Error("Stream unavailable");
+          const errBody = (await res.json().catch(() => null)) as {
+            error?: { message?: string };
+          } | null;
+          throw new Error(
+            errBody?.error?.message ?? "Stream unavailable"
+          );
         }
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
@@ -191,8 +204,14 @@ export function OutlineEditor({
         setGenerating(false);
         setStreaming(false);
         return;
-      } catch {
+      } catch (err) {
         setStreaming(false);
+        const message = err instanceof Error ? err.message : "";
+        if (message === NO_PROJECT_CONTENT_MESSAGE) {
+          toast.error(message);
+          setGenerating(false);
+          return;
+        }
         toast.message("Falling back to standard generation…");
       }
     }
@@ -288,25 +307,46 @@ export function OutlineEditor({
 
   return (
     <div className="space-y-6">
-          {updatesSparse && projectId && (
+      {updatesEmpty && projectId && (
         <div
           role="status"
-          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm"
         >
-          <p className="font-medium text-amber-900 dark:text-amber-100">
-            Project updates are thin — AI may repeat generic slides.
+          <p className="font-medium text-destructive">
+            Add project updates before generating a deck.
           </p>
           <p className="mt-1 text-muted-foreground">
-            {updatesCoverage}. Slides are built from your project&apos;s fixed
-            update fields (Goals, Metrics, Risks, etc.); deck type changes which
-            fields are emphasized, not which tabs exist.{" "}
+            AI invents slide structure from your update content and deck brief —
+            there are no default slides until you add facts.{" "}
             <Link
               href={`/projects/${projectId}/updates`}
               className="text-link underline-offset-4 hover:underline"
             >
               Add update content
+            </Link>
+            .
+          </p>
+        </div>
+      )}
+
+      {!updatesEmpty && updatesSparse && projectId && (
+        <div
+          role="status"
+          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm"
+        >
+          <p className="font-medium text-amber-900 dark:text-amber-100">
+            Project updates are thin — slides may be short.
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            {updatesCoverage}. AI builds structure from whatever facts you
+            provide; add more detail in{" "}
+            <Link
+              href={`/projects/${projectId}/updates`}
+              className="text-link underline-offset-4 hover:underline"
+            >
+              project updates
             </Link>{" "}
-            before generating.
+            or steer with the deck brief below.
           </p>
         </div>
       )}
@@ -317,11 +357,22 @@ export function OutlineEditor({
         initialSections={
           initialIncludedSections?.length
             ? initialIncludedSections
-            : defaultIncludedSectionsForDeckType(deckType)
+            : sectionsWithData?.length
+              ? sectionsWithData
+              : [...PROJECT_UPDATE_SECTION_IDS]
         }
         initialBrief={initialDeckBrief}
         sectionCoverage={sectionCoverage}
+        sectionsWithData={sectionsWithData}
         disabled={generating}
+      />
+
+      <AiOutlineTools
+        deckId={deckId}
+        onOutlineReplace={(next) => {
+          setOutline(next as DeckOutline);
+          setDirty(true);
+        }}
       />
 
       <div className="flex flex-wrap items-end gap-4">
@@ -349,7 +400,7 @@ export function OutlineEditor({
         <Button
           variant={outline ? "outline" : "default"}
           onClick={handleGenerate}
-          disabled={generating}
+          disabled={generating || !canGenerate}
         >
           {generating ? "Generating…" : outline ? "Regenerate" : "Generate outline"}
         </Button>
@@ -392,12 +443,14 @@ export function OutlineEditor({
             No outline yet for <strong>{deckName}</strong>.
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Generate an AI outline from your project updates.
+            {updatesEmpty
+              ? "Add project updates to generate an AI outline."
+              : "Generate an AI outline from your project updates."}
           </p>
           <Button
             className="mt-6"
             onClick={handleGenerate}
-            disabled={generating}
+            disabled={generating || !canGenerate}
           >
             {generating ? "Generating…" : "Generate outline"}
           </Button>

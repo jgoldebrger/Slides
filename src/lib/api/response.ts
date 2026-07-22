@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { PermissionError } from "@/lib/permissions";
 import { RateLimitError } from "@/lib/rate-limit";
+import { NoProjectContentError } from "@/lib/ai/no-project-content-error";
 
 type ApiErrorOptions = {
   retryAfterSeconds?: number;
@@ -41,6 +42,9 @@ export function handleApiError(err: unknown) {
       unauthorized ? 401 : 403,
       unauthorized ? "unauthorized" : "forbidden"
     );
+  }
+  if (err instanceof NoProjectContentError) {
+    return apiError(err.message, 400, "no_project_content");
   }
   console.error("[api]", err);
   return apiError("Internal server error", 500, "internal_error");

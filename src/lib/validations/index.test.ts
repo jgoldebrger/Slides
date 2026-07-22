@@ -44,6 +44,27 @@ describe("deckOutlineSchema", () => {
     });
     expect(result.success).toBe(true);
   });
+
+  it("accepts minimal 2-slide outline for sparse projects", () => {
+    const result = deckOutlineSchema.safeParse({
+      deckType: "project_status",
+      slides: [
+        {
+          title: "Project Update",
+          layout: "title",
+          type: "title",
+          summary: "Cover slide",
+        },
+        {
+          title: "Add project updates",
+          layout: "bullets",
+          type: "content",
+          summary: "Placeholder until updates are added",
+        },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
 });
 
 describe("rewriteInstructionsSchema", () => {

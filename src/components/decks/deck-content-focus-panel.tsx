@@ -6,6 +6,7 @@ import { getActionError } from "@/lib/action-result";
 import { updateDeckContentFocus } from "@/lib/actions/deck-content-focus";
 import {
   defaultIncludedSectionsForDeckType,
+  PROJECT_UPDATE_SECTION_IDS,
   PROJECT_UPDATE_SECTIONS,
   type ProjectUpdateSectionId,
 } from "@/lib/ai/update-sections";
@@ -20,6 +21,7 @@ type DeckContentFocusPanelProps = {
   initialSections: ProjectUpdateSectionId[];
   initialBrief?: string;
   sectionCoverage?: Record<ProjectUpdateSectionId, boolean>;
+  sectionsWithData?: ProjectUpdateSectionId[];
   disabled?: boolean;
 };
 
@@ -29,12 +31,16 @@ export function DeckContentFocusPanel({
   initialSections,
   initialBrief = "",
   sectionCoverage,
+  sectionsWithData,
   disabled = false,
 }: DeckContentFocusPanelProps) {
+  const fallbackSections =
+    sectionsWithData?.length
+      ? sectionsWithData
+      : [...PROJECT_UPDATE_SECTION_IDS];
+
   const [sections, setSections] = useState<ProjectUpdateSectionId[]>(
-    initialSections.length
-      ? initialSections
-      : defaultIncludedSectionsForDeckType(deckType)
+    initialSections.length ? initialSections : fallbackSections
   );
   const [brief, setBrief] = useState(initialBrief);
   const [saving, setSaving] = useState(false);
@@ -82,14 +88,15 @@ export function DeckContentFocusPanel({
       <div>
         <h3 className="font-medium">Content focus</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Choose which project update fields feed this deck. Your project still
-          has all tabs — this only affects{" "}
+          Choose which project update facts AI may use for this deck — not which
+          slides to create. Your project still has all tabs; this only scopes
+          what the AI can draw from for{" "}
           <span className="font-medium">{deckTypeLabel(deckType)}</span>.
         </p>
       </div>
 
       <div className="space-y-2">
-        <Label>Sections to include</Label>
+        <Label>Facts AI may use</Label>
         <div className="grid gap-2 sm:grid-cols-2">
           {PROJECT_UPDATE_SECTIONS.map((section) => {
             const checked = sections.includes(section.id);
@@ -128,7 +135,7 @@ export function DeckContentFocusPanel({
           disabled={disabled || saving}
           onClick={handleResetToDeckType}
         >
-          Reset to {deckTypeLabel(deckType)} defaults
+          Reset section filter to {deckTypeLabel(deckType)} defaults
         </Button>
       </div>
 

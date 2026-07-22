@@ -17,6 +17,8 @@ import type { ProjectUpdateInput } from "@/lib/validations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AiIntakePanel } from "@/components/projects/ai-intake-panel";
+import { AiAddonsHub } from "@/components/decks/ai-addons-hub";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const ESSENTIAL_TABS = [
@@ -144,6 +146,26 @@ export function ProjectUpdatesForm({
     }));
   }
 
+  function mergeAiUpdates(updates: Partial<ProjectUpdateInput>) {
+    setData((prev) => ({
+      ...prev,
+      goals: updates.goals?.length ? updates.goals : prev.goals,
+      progress: updates.progress || prev.progress,
+      completed_work: updates.completed_work?.length
+        ? updates.completed_work
+        : prev.completed_work,
+      current_tasks: updates.current_tasks?.length
+        ? updates.current_tasks
+        : prev.current_tasks,
+      milestones: updates.milestones?.length ? updates.milestones : prev.milestones,
+      metrics: updates.metrics?.length ? updates.metrics : prev.metrics,
+      risks: updates.risks?.length ? updates.risks : prev.risks,
+      blockers: updates.blockers?.length ? updates.blockers : prev.blockers,
+      next_steps: updates.next_steps?.length ? updates.next_steps : prev.next_steps,
+    }));
+    setDirty(true);
+  }
+
   async function handleImportMeetingNotes() {
     setImportingNotes(true);
     const result = await parseMeetingNotesToUpdate(projectId, meetingNotes);
@@ -221,6 +243,14 @@ export function ProjectUpdatesForm({
           <p className="whitespace-pre-wrap text-sm text-muted-foreground">{updateNarrative}</p>
         )}
       </section>
+
+      <AiIntakePanel
+        projectId={projectId}
+        onParsedUpdates={mergeAiUpdates}
+        onGapFillApplied={mergeAiUpdates}
+      />
+
+      <AiAddonsHub projectId={projectId} scope="project" />
 
       <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground">
         <p>

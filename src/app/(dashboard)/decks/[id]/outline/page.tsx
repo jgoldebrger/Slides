@@ -8,10 +8,11 @@ import { redirectViewerFromDeckEdit } from "@/lib/viewer-guard";
 import { audienceFromDeckMetadata } from "@/lib/ai/load-deck-audience";
 import {
   describeProjectUpdatesCoverage,
+  defaultIncludedSectionsForProject,
   getProjectUpdatesCoverage,
   isProjectUpdatesSparse,
+  sectionsWithData,
 } from "@/lib/ai/project-updates-context";
-import { defaultIncludedSectionsForDeckType } from "@/lib/ai/update-sections";
 import { parseDeckMetadata } from "@/lib/validations/deck-metadata";
 import { createClient } from "@/lib/supabase/server";
 import type { DeckOutline, DeckType } from "@/types/slide";
@@ -58,7 +59,9 @@ export default async function DeckOutlinePage({
   const updatesCoverage = describeProjectUpdatesCoverage(sectionCoverage);
   const initialIncludedSections =
     (metadata.includedSections as import("@/lib/ai/update-sections").ProjectUpdateSectionId[] | undefined) ??
-    defaultIncludedSectionsForDeckType(deckType);
+    defaultIncludedSectionsForProject(updates);
+  const filledSections = sectionsWithData(updates);
+  const updatesEmpty = filledSections.length === 0;
 
   return (
     <div className="space-y-6">
@@ -87,7 +90,9 @@ export default async function DeckOutlinePage({
         initialIncludedSections={initialIncludedSections}
         initialDeckBrief={metadata.deckBrief ?? ""}
         sectionCoverage={sectionCoverage}
+        sectionsWithData={filledSections}
         projectId={deck.project_id}
+        updatesEmpty={updatesEmpty}
         updatesSparse={updatesSparse}
         updatesCoverage={updatesCoverage}
       />

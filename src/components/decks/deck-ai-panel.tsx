@@ -27,12 +27,23 @@ import {
   TRANSLATE_LANGUAGE_LABELS,
   type TranslateLanguage,
 } from "@/lib/ai/schemas/translate";
+import { AiFeaturesHub } from "@/components/decks/ai-features-hub";
+import { AiAddonsHub } from "@/components/decks/ai-addons-hub";
 import { pollAiGeneration } from "@/lib/hooks/poll-ai-generation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type DeckAiPanelProps = {
   deckId: string;
+  slideId?: string;
   initialAudience?: DeckAudience;
   initialQa?: DeckQaResult | null;
   initialAutoRefreshWeekly?: boolean;
@@ -40,6 +51,7 @@ type DeckAiPanelProps = {
 
 export function DeckAiPanel({
   deckId,
+  slideId,
   initialAudience = "general",
   initialQa = null,
   initialAutoRefreshWeekly = false,
@@ -57,6 +69,7 @@ export function DeckAiPanel({
   const [narrating, setNarrating] = useState(false);
   const [titleImageLoading, setTitleImageLoading] = useState(false);
   const [autoWeekly, setAutoWeekly] = useState(initialAutoRefreshWeekly);
+  const [pendingAudience, setPendingAudience] = useState<DeckAudience | null>(null);
 
   async function handleRunQa() {
     setRunningQa(true);
@@ -167,7 +180,10 @@ export function DeckAiPanel({
         toast.error(actionError);
         return;
       }
-      if (!("generationId" in result) || !result.generationId) return;
+      if (!("generationId" in result) || !result.generationId) {
+        toast.error("Could not start translation — try again");
+        return;
+      }
       toast.message("Translating deck…");
       await pollAiGeneration(deckId, result.generationId);
       toast.success(`Deck translated to ${TRANSLATE_LANGUAGE_LABELS[translateLang]}`);
@@ -187,7 +203,10 @@ export function DeckAiPanel({
         toast.error(actionError);
         return;
       }
-      if (!("generationId" in result) || !result.generationId) return;
+      if (!("generationId" in result) || !result.generationId) {
+        toast.error("Could not start narration — try again");
+        return;
+      }
       toast.message("Generating narration for all slides…");
       await pollAiGeneration(deckId, result.generationId);
       toast.success("Deck narration cached");
@@ -239,7 +258,10 @@ export function DeckAiPanel({
         <select
           id="deck-audience"
           value={audience}
-          onChange={(e) => void handleAudienceVariant(e.target.value as DeckAudience)}
+          onChange={(e) => {
+            const next = e.target.value as DeckAudience;
+            if (next !== audience) setPendingAudience(next);
+          }}
           disabled={variantLoading !== null}
           className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
         >
@@ -344,6 +366,46 @@ export function DeckAiPanel({
         <Users className="h-3 w-3" aria-hidden />
         Audience affects outline, fill, refresh, and rewrite.
       </p>
+
+      <AiFeaturesHub deckId={deckId} slideId={slideId} />
+      <AiAddonsHub deckId={deckId} />
+
+      <Dialog
+        open={pendingAudience !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingAudience(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change audience variant?</DialogTitle>
+            <DialogDescription>
+              {pendingAudience
+                ? forkAsSeparateDeck
+                  ? `This forks a new deck for the ${DECK_AUDIENCE_LABELS[pendingAudience]} audience.`
+                  : `This regenerates slides for the ${DECK_AUDIENCE_LABELS[pendingAudience]} audience.`
+                : null}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setPendingAudience(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={variantLoading !== null}
+              onClick={() => {
+                if (!pendingAudience) return;
+                const target = pendingAudience;
+                setPendingAudience(null);
+                void handleAudienceVariant(target);
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

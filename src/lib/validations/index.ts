@@ -64,7 +64,7 @@ export const outlineSlideSchema = z.object({
 
 export const deckOutlineSchema = z.object({
   deckType: z.enum(DECK_TYPES),
-  slides: z.array(outlineSlideSchema).min(3).max(30),
+  slides: z.array(outlineSlideSchema).min(2).max(30),
 });
 
 export const slideSchema = z.object({

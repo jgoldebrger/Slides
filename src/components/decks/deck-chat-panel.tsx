@@ -167,7 +167,7 @@ export function DeckChatPanel({
             }}
           >
             <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="e.g. add a risks slide after slide 3" disabled={sending} aria-label="Deck chat message" />
-            <Button type="submit" size="icon" disabled={sending || !input.trim()}>
+            <Button type="submit" size="icon" disabled={sending || !input.trim()} aria-label="Send message">
               <Send className="h-4 w-4" aria-hidden />
             </Button>
           </form>

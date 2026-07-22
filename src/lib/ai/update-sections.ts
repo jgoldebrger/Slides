@@ -56,8 +56,8 @@ export function includedSectionsPromptRules(
   includedSections: ProjectUpdateSectionId[]
 ): string {
   const labels = includedSections.map((id) => sectionLabel(id));
-  return `Use ONLY these project update sections as slide sources: ${labels.join(", ")}.
-Do not create slides for any other update fields. Sections not listed were excluded by the user for this deck.`;
+  return `Facts available for this deck are limited to these project update fields: ${labels.join(", ")}.
+Do not use facts from other fields. Do NOT create one slide per field — invent narrative slide titles and combine related facts.`;
 }
 
 export function deckBriefPromptBlock(deckBrief: string | undefined): string {

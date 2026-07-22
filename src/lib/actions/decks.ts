@@ -2,12 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { rewritePromptHash } from "@/lib/ai/rewrite-slide";
-import {
-  enqueueGenerateDeckJob,
+import { enqueueGenerateDeckJob,
   enqueueOutlineDeckJob,
   enqueueRefreshDeckJob,
 } from "@/lib/decks/enqueue-jobs";
 import { assertDeckJobEntitlement } from "@/lib/deck-rate-limit";
+import { contentFocusFromMetadata } from "@/lib/ai/load-deck-content-focus";
+import {
+  prepareProjectUpdatesForDeck,
+} from "@/lib/ai/project-updates-context";
+import { assertProjectContentForGeneration } from "@/lib/ai/no-project-content-error";
 import {
   requireDeckEdit,
   requireDeckAccess,
@@ -22,6 +26,23 @@ export async function enqueueOutlineGeneration(deckId: string) {
   const { supabase, user, deck } = await requireDeckEdit(deckId);
 
   try {
+    const { data: updates } = await supabase
+      .from("project_updates")
+      .select("*")
+      .eq("project_id", deck.project_id)
+      .maybeSingle();
+
+    const contentFocus = contentFocusFromMetadata(
+      deck.metadata,
+      deck.type,
+      updates
+    );
+    const projectUpdates = prepareProjectUpdatesForDeck(
+      updates,
+      contentFocus.includedSections
+    );
+    assertProjectContentForGeneration(projectUpdates);
+
     await assertDeckJobEntitlement(supabase, deck.org_id, "outline");
     await enqueueOutlineDeckJob({
       deckId,
