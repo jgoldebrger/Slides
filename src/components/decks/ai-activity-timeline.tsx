@@ -5,21 +5,33 @@ import { getDeckAiActivity } from "@/lib/actions/ai-platform";
 import type { AiActivityEntry } from "@/lib/ai/activity";
 
 type AiActivityTimelineProps = {
-  deckId: string;
+  deckId?: string;
+  entries?: AiActivityEntry[];
 };
 
-export function AiActivityTimeline({ deckId }: AiActivityTimelineProps) {
-  const [entries, setEntries] = useState<AiActivityEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+export function AiActivityTimeline({
+  deckId,
+  entries: initialEntries,
+}: AiActivityTimelineProps) {
+  const [entries, setEntries] = useState<AiActivityEntry[]>(
+    initialEntries ?? []
+  );
+  const [loading, setLoading] = useState(!initialEntries && Boolean(deckId));
 
   useEffect(() => {
+    if (initialEntries) {
+      setEntries(initialEntries);
+      setLoading(false);
+      return;
+    }
+    if (!deckId) return;
     void (async () => {
       setLoading(true);
       const result = await getDeckAiActivity(deckId);
       setEntries(result.entries);
       setLoading(false);
     })();
-  }, [deckId]);
+  }, [deckId, initialEntries]);
 
   if (loading) {
     return <p className="text-sm text-muted-foreground">Loading AI activity…</p>;

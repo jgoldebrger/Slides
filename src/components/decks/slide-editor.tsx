@@ -15,7 +15,11 @@ import { ImageAnnotatorModal } from "@/components/slides/image-annotator-modal";
 import { DeckRevisionPanel, type RevisionRow } from "@/components/decks/deck-revision-panel";
 import { DeckSharePanel, type ShareLinkRow } from "@/components/decks/deck-share-panel";
 import { DeckAiPanel } from "@/components/decks/deck-ai-panel";
-import { DeckChatPanel } from "@/components/decks/deck-chat-panel";
+import { DeckCopilotWorkspace } from "@/components/decks/deck-copilot-workspace";
+import { AiContextInspector } from "@/components/decks/ai-context-inspector";
+import { ScopedRegeneratePanel } from "@/components/decks/scoped-regenerate-panel";
+import { AiInlineCitations } from "@/components/decks/ai-inline-citations";
+import { AiFeedbackButtons } from "@/components/decks/ai-feedback-buttons";
 import { RefreshDiffPanel } from "@/components/decks/refresh-diff-panel";
 import {
   addSlide,
@@ -290,10 +294,17 @@ export function SlideEditor({
           initialQa={initialQa}
           initialAutoRefreshWeekly={initialAutoRefreshWeekly}
         />
-        <DeckChatPanel
+        <DeckCopilotWorkspace
           deckId={deckId}
+          slideId={selectedSlide?.id}
           onSelectSlide={setSelectedId}
           onActionsComplete={() => router.refresh()}
+        />
+        <AiContextInspector deckId={deckId} />
+        <ScopedRegeneratePanel
+          deckId={deckId}
+          slideId={selectedSlide?.id}
+          onComplete={() => router.refresh()}
         />
         <DeckRevisionPanel
           deckId={deckId}
@@ -336,19 +347,23 @@ export function SlideEditor({
 
       <div>
         {selectedSlide ? (
-          <SlideEditorPanel
-            key={selectedSlide.id}
-            slide={selectedSlide}
-            deckId={deckId}
-            slideCount={slides.length}
-            onUpdate={onSlideUpdate}
-            onBackgroundAppliedToAll={onBackgroundAppliedToAll}
-            onAnnotateImage={
-              selectedSlide.content.imageUrl
-                ? () => setAnnotatorOpen(true)
-                : undefined
-            }
-          />
+          <div className="space-y-4">
+            <SlideEditorPanel
+              key={selectedSlide.id}
+              slide={selectedSlide}
+              deckId={deckId}
+              slideCount={slides.length}
+              onUpdate={onSlideUpdate}
+              onBackgroundAppliedToAll={onBackgroundAppliedToAll}
+              onAnnotateImage={
+                selectedSlide.content.imageUrl
+                  ? () => setAnnotatorOpen(true)
+                  : undefined
+              }
+            />
+            <AiInlineCitations deckId={deckId} slideId={selectedSlide.id} />
+            <AiFeedbackButtons deckId={deckId} slideId={selectedSlide.id} />
+          </div>
         ) : (
           <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
             Select a slide to edit

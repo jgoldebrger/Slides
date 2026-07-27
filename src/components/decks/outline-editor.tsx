@@ -24,6 +24,7 @@ import {
 } from "@/lib/ai/audience";
 import { DeckContentFocusPanel } from "@/components/decks/deck-content-focus-panel";
 import { AiOutlineTools } from "@/components/decks/ai-outline-tools";
+import { AiVariantCompare } from "@/components/decks/ai-variant-compare";
 import { SLIDE_LAYOUTS } from "@/types/slide";
 import type { DeckOutline, DeckType, OutlineSlide } from "@/types/slide";
 import type { ProjectUpdateSectionId } from "@/lib/ai/update-sections";
@@ -373,6 +374,11 @@ export function OutlineEditor({
           setOutline(next as DeckOutline);
           setDirty(true);
         }}
+      />
+
+      <AiVariantCompare
+        deckId={deckId}
+        onApplied={() => router.refresh()}
       />
 
       <div className="flex flex-wrap items-end gap-4">

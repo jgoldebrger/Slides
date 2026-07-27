@@ -47,6 +47,7 @@ export default async function DashboardLayout({
           userEmail={userEmail}
           isViewer={isViewer}
           canManageTeam={canManageTeam}
+          showAiAgents={canManageTeam}
           orgs={orgs}
           activeOrgId={orgId}
         />

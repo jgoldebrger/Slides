@@ -13,6 +13,8 @@ import {
   Users,
   Menu,
   X,
+  History,
+  Bot,
 } from "lucide-react";
 import { OrgSwitcher } from "@/components/dashboard/org-switcher";
 import type { UserOrg } from "@/lib/org-context";
@@ -45,6 +47,7 @@ export function DashboardSidebar({
   userEmail,
   isViewer = false,
   canManageTeam = false,
+  showAiAgents = false,
   orgs = [],
   activeOrgId = "",
 }: {
@@ -52,6 +55,7 @@ export function DashboardSidebar({
   userEmail: string;
   isViewer?: boolean;
   canManageTeam?: boolean;
+  showAiAgents?: boolean;
   orgs?: UserOrg[];
   activeOrgId?: string;
 }) {
@@ -66,6 +70,10 @@ export function DashboardSidebar({
     ? viewerNav
     : [
         ...editorNavBase,
+        { href: "/ai-history", label: "AI History", icon: History },
+        ...(showAiAgents
+          ? [{ href: "/agents", label: "AI Agents", icon: Bot }]
+          : []),
         ...(canManageTeam
           ? [{ href: "/team", label: "Team", icon: Users }]
           : []),

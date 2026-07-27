@@ -1,5 +1,11 @@
 import { z } from "zod";
 import { DECK_AUDIENCES } from "@/lib/ai/audience";
+import {
+  contextSnapshotSchema,
+  copilotModeSchema,
+  slideCitationMapSchema,
+  toolTraceSchema,
+} from "@/lib/ai/workspace/types";
 import { deckQaResultSchema } from "@/lib/ai/schemas/deck-ai";
 import { PROJECT_UPDATE_SECTION_IDS } from "@/lib/ai/update-sections";
 
@@ -27,6 +33,20 @@ export const deckMetadataSchema = z.object({
   autoRefreshWeekly: z.boolean().optional(),
   forkedFrom: z.string().uuid().optional(),
   translatedLanguage: z.string().optional(),
+  copilotMode: copilotModeSchema.optional(),
+  pinnedInstructions: z.string().max(2000).optional(),
+  lastContextSnapshot: contextSnapshotSchema.optional(),
+  slideCitations: slideCitationMapSchema.optional(),
+  lastToolTraces: z.array(toolTraceSchema).max(20).optional(),
+  pendingVariants: z
+    .array(
+      z.object({
+        strategy: z.string(),
+        outline: z.unknown(),
+      })
+    )
+    .max(5)
+    .optional(),
 });
 
 export type DeckMetadata = z.infer<typeof deckMetadataSchema>;

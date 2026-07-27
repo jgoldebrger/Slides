@@ -10,6 +10,7 @@ import {
   runPaceScore,
   runPresenterCopilot,
 } from "@/lib/actions/ai-features";
+import { PresentModesPanel } from "@/components/decks/present-modes-panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -112,6 +113,8 @@ export function AiPresentPanel({
           {output}
         </pre>
       )}
+
+      <PresentModesPanel deckId={deckId} slideIndex={slideIndex} />
     </div>
   );
 }
