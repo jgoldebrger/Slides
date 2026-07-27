@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   deckBackgroundAudioPath,
-  isAllowedAudioFile,
+  resolveAudioContentType,
   validateBackgroundAudioFile,
 } from "@/lib/player/background-upload";
 
@@ -47,8 +47,12 @@ describe("deckBackgroundAudioPath", () => {
   });
 });
 
-describe("isAllowedAudioFile", () => {
-  it("allows extension fallback for wav", () => {
-    expect(isAllowedAudioFile({ name: "a.wav", type: "" })).toBe(true);
+describe("resolveAudioContentType", () => {
+  it("maps mp3 extension when browser omits mime type", () => {
+    expect(resolveAudioContentType("track.mp3", "")).toBe("audio/mpeg");
+  });
+
+  it("maps wav extension when browser omits mime type", () => {
+    expect(resolveAudioContentType("music.wav", "")).toBe("audio/wav");
   });
 });

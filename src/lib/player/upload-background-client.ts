@@ -8,6 +8,7 @@ import {
   prepareDeckBackgroundImageUpload,
 } from "@/lib/actions/player";
 import {
+  resolveAudioContentType,
   validateBackgroundAudioFile,
   validateBackgroundImageFile,
 } from "@/lib/player/background-upload";
@@ -30,15 +31,23 @@ export async function uploadBackgroundAudioClient(deckId: string, file: File) {
   const { path } = prepared;
 
   const supabase = createClient();
+  const contentType = resolveAudioContentType(file.name, file.type);
   const { error: uploadError } = await supabase.storage
     .from("slide-assets")
     .upload(path, file, {
-      contentType: file.type || undefined,
+      contentType,
       upsert: true,
     });
 
   if (uploadError) {
-    return { error: uploadError.message || "Upload failed" };
+    const message = uploadError.message || "Upload failed";
+    if (message.toLowerCase().includes("mime type")) {
+      return {
+        error:
+          "Audio uploads are not enabled in storage yet. Run migration 023_slide_assets_audio_mime.sql on Supabase.",
+      };
+    }
+    return { error: message };
   }
 
   return completeDeckBackgroundAudioUpload(deckId, path);

@@ -28,6 +28,22 @@ export function isAllowedAudioFile(file: Pick<File, "type" | "name">): boolean {
   return ext === "mp3" || ext === "wav";
 }
 
+/** Normalize Content-Type for Supabase Storage bucket allowlist. */
+export function resolveAudioContentType(
+  fileName: string,
+  fileType: string
+): string {
+  if (
+    fileType &&
+    AUDIO_MIME_TYPES.includes(fileType as (typeof AUDIO_MIME_TYPES)[number])
+  ) {
+    return fileType;
+  }
+  const ext = extensionFromName(fileName);
+  if (ext === "wav") return "audio/wav";
+  return "audio/mpeg";
+}
+
 export function isAllowedImageFile(file: Pick<File, "type" | "name">): boolean {
   if (IMAGE_MIME_TYPES.includes(file.type as (typeof IMAGE_MIME_TYPES)[number])) {
     return true;
