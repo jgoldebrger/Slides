@@ -112,7 +112,7 @@ export async function runDeckAddon(
     const meta = (updates?.metadata ?? {}) as Record<string, unknown>;
     const previousUpdates = meta.previousSnapshot as Record<string, unknown> | undefined;
 
-    let twinCandidates: Array<{ deckName: string; title: string; body: string }> = [];
+    const twinCandidates: Array<{ deckName: string; title: string; body: string }> = [];
     if (featureId === "addon_j_46_slide_twin") {
       const { data: orgDecks } = await supabase
         .from("decks")

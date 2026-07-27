@@ -547,7 +547,7 @@ export function SlideEditorPanel({
             </div>
 
             <SlideVisualUpload
-              slide={slideRef.current}
+              slide={slide}
               deckId={deckId}
               onAnnotateImage={onAnnotateImage}
               onVisualReady={(updated) => {
@@ -732,7 +732,7 @@ export function SlideEditorPanel({
           )}
 
           <SlideVisualUpload
-            slide={slideRef.current}
+            slide={slide}
             deckId={deckId}
             onAnnotateImage={onAnnotateImage}
             onVisualReady={(updated) => {
@@ -744,8 +744,7 @@ export function SlideEditorPanel({
             }}
           />
 
-          {(slideRef.current.content.imagePath ||
-            slideRef.current.content.imageUrl) && (
+          {(slide.content.imagePath || slide.content.imageUrl) && (
             <Button
               type="button"
               variant="outline"

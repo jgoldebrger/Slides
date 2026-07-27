@@ -33,15 +33,16 @@ export function SlideVisualUpload({
   const refineFormRef = useRef<HTMLFormElement>(null);
   const attachFormRef = useRef<HTMLFormElement>(null);
   const [generating, setGenerating] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(slide.content.imageUrl);
+  const [previewOverride, setPreviewOverride] = useState<string | undefined>();
   const [visualStyle, setVisualStyle] = useState("illustration");
+  const previewUrl = previewOverride ?? slide.content.imageUrl;
 
   function applyResult(result: {
     imagePath?: string;
     imageUrl?: string | null;
     layout?: Slide["layout"];
   }) {
-    if (result.imageUrl) setPreviewUrl(result.imageUrl);
+    if (result.imageUrl) setPreviewOverride(result.imageUrl);
 
     onVisualReady({
       ...slide,

@@ -54,6 +54,7 @@ export const ImageAnnotatorCanvas = forwardRef<
   const startRef = useRef<Point | null>(null);
   const penPointsRef = useRef<Point[]>([]);
   const [ready, setReady] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cropRect, setCropRect] = useState<{
     x: number;
     y: number;
@@ -98,6 +99,7 @@ export const ImageAnnotatorCanvas = forwardRef<
   useEffect(() => {
     let cancelled = false;
     setReady(false);
+    setLoadError(null);
     historyRef.current = [];
     setCropRect(null);
 
@@ -115,7 +117,10 @@ export const ImageAnnotatorCanvas = forwardRef<
         pushSnapshot();
         setReady(true);
       } catch {
-        if (!cancelled) setReady(false);
+        if (!cancelled) {
+          setReady(false);
+          setLoadError("Could not load image. Try closing and reopening the editor.");
+        }
       }
     })();
 
@@ -335,8 +340,8 @@ export const ImageAnnotatorCanvas = forwardRef<
   return (
     <div className={cn("relative overflow-auto rounded-md border border-border bg-muted/30", className)}>
       {!ready && (
-        <div className="flex aspect-video items-center justify-center text-sm text-muted-foreground">
-          Loading image…
+        <div className="flex aspect-video items-center justify-center px-4 text-center text-sm text-muted-foreground">
+          {loadError ?? "Loading image…"}
         </div>
       )}
       <canvas

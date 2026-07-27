@@ -13,6 +13,10 @@ import { SlideEditorPanel } from "@/components/slides/slide-editor-panel";
 import { SlideList } from "@/components/slides/slide-list";
 import { SlidePreview } from "@/components/slides/slide-preview";
 import { ImageAnnotatorModal } from "@/components/slides/image-annotator-modal";
+import {
+  resolveAnnotatorImageSrc,
+  slideHasAnnotatableImage,
+} from "@/lib/slides/image-annotator";
 import { DeckSharePanel, type ShareLinkRow } from "@/components/decks/deck-share-panel";
 import { RefreshDiffPanel } from "@/components/decks/refresh-diff-panel";
 import {
@@ -68,6 +72,14 @@ export function SlideEditor({
   const prevStatusRef = useRef(deckStatus);
 
   const selectedSlide = slides.find((s) => s.id === selectedId) ?? null;
+  const annotatorImageSrc =
+    selectedSlide && slideHasAnnotatableImage(selectedSlide.content)
+      ? resolveAnnotatorImageSrc(
+          deckId,
+          selectedSlide.id,
+          selectedSlide.content
+        )
+      : null;
   const isGenerating = deckStatus === "generating";
 
   const changedSlideIds = new Set(
@@ -299,16 +311,14 @@ export function SlideEditor({
                 brandTheme={brandTheme}
                 deckBackgroundUrl={deckBackgroundUrl}
                 onImageClick={
-                  selectedSlide.content.imageUrl
-                    ? () => setAnnotatorOpen(true)
-                    : undefined
+                  annotatorImageSrc ? () => setAnnotatorOpen(true) : undefined
                 }
               />
-              {selectedSlide.content.imageUrl && (
+              {annotatorImageSrc && (
                 <ImageAnnotatorModal
                   open={annotatorOpen}
                   onOpenChange={setAnnotatorOpen}
-                  imageUrl={selectedSlide.content.imageUrl}
+                  imageUrl={annotatorImageSrc}
                   deckId={deckId}
                   slide={selectedSlide}
                   onComplete={onSlideUpdate}
@@ -322,9 +332,7 @@ export function SlideEditor({
                 onUpdate={onSlideUpdate}
                 onBackgroundAppliedToAll={onBackgroundAppliedToAll}
                 onAnnotateImage={
-                  selectedSlide.content.imageUrl
-                    ? () => setAnnotatorOpen(true)
-                    : undefined
+                  annotatorImageSrc ? () => setAnnotatorOpen(true) : undefined
                 }
                 simple
               />

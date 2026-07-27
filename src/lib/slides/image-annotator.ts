@@ -137,10 +137,34 @@ export function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob | null>
   });
 }
 
+/** Same-origin proxy avoids CORS tainting the canvas when exporting PNG. */
+export function resolveAnnotatorImageSrc(
+  deckId: string,
+  slideId: string,
+  content: { imageUrl?: string; imagePath?: string }
+): string | null {
+  if (content.imagePath) {
+    return `/api/decks/${deckId}/slides/${slideId}/visual`;
+  }
+  return content.imageUrl ?? null;
+}
+
+export function slideHasAnnotatableImage(content: {
+  imageUrl?: string;
+  imagePath?: string;
+}): boolean {
+  return Boolean(content.imagePath || content.imageUrl);
+}
+
 export function loadImageElement(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.crossOrigin = "anonymous";
+    const sameOrigin =
+      typeof window !== "undefined" &&
+      (src.startsWith("/") || src.startsWith(window.location.origin));
+    if (!sameOrigin) {
+      img.crossOrigin = "anonymous";
+    }
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error("Failed to load image"));
     img.src = src;
