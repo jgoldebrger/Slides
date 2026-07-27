@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ApplyBrandingToggle } from "@/components/decks/apply-branding-toggle";
 import { DeckExportBanner } from "@/components/decks/deck-export-banner";
 import { DeckGeneratingBanner } from "@/components/decks/deck-generating-banner";
 import { DeckStatusBadge } from "@/components/decks/deck-status-badge";
@@ -12,7 +11,6 @@ import { getSignedStorageUrl, resolveSlideBackgroundUrl, resolveSlideImageUrl } 
 import { EmptyState } from "@/components/shared/state";
 import { requireDeckAccess } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
-import { audienceFromDeckMetadata } from "@/lib/ai/load-deck-audience";
 import { parseDeckMetadata } from "@/lib/validations/deck-metadata";
 import { Button } from "@/components/ui/button";
 import { redirectViewerFromDeckEdit } from "@/lib/viewer-guard";
@@ -84,13 +82,6 @@ export default async function DeckEditorPage({
     .eq("deck_id", id)
     .order("created_at", { ascending: false });
 
-  const { data: revisions } = await supabase
-    .from("deck_revisions")
-    .select("id, revision, reason, created_at")
-    .eq("deck_id", id)
-    .order("revision", { ascending: false })
-    .limit(20);
-
   const { data: latestExport } = await supabase
     .from("exports")
     .select("id, status")
@@ -100,7 +91,6 @@ export default async function DeckEditorPage({
     .maybeSingle();
 
   const metadata = parseDeckMetadata(deck.metadata);
-  const audience = audienceFromDeckMetadata(deck.metadata);
 
   return (
     <div className="space-y-6">
@@ -116,7 +106,7 @@ export default async function DeckEditorPage({
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <DeckStatusBadge status={deck.status} />
             <p className="text-muted-foreground">
-              Edit slides, reorder, and preview.
+              Click a slide to edit. Changes save automatically.
             </p>
           </div>
         </div>
@@ -135,12 +125,6 @@ export default async function DeckEditorPage({
         deckId={id}
         exportId={latestExport?.id ?? null}
         initialStatus={latestExport?.status ?? null}
-      />
-
-      <ApplyBrandingToggle
-        deckId={id}
-        initialValue={deck.apply_branding ?? true}
-        className="max-w-xl"
       />
 
       {mappedSlides.length === 0 ? (
@@ -167,12 +151,8 @@ export default async function DeckEditorPage({
           brandTheme={brandTheme}
           deckBackgroundUrl={deckBackgroundUrl}
           initialShareLinks={shareLinks ?? []}
-          initialRevisions={revisions ?? []}
           deckStatus={deck.status}
-          initialAudience={audience}
-          initialQa={metadata.lastQa ?? null}
           initialShareBlurb={metadata.shareBlurb ?? null}
-          initialAutoRefreshWeekly={metadata.autoRefreshWeekly ?? false}
         />
       )}
     </div>

@@ -59,6 +59,8 @@ type SlideEditorPanelProps = {
     backgroundImageUrl?: string | null;
   }) => void;
   onAnnotateImage?: () => void;
+  /** Streamlined UI — title, content, quick AI chips, collapsible extras */
+  simple?: boolean;
 };
 
 function buildContentFromFields({
@@ -93,6 +95,7 @@ export function SlideEditorPanel({
   onUpdate,
   onBackgroundAppliedToAll,
   onAnnotateImage,
+  simple = false,
 }: SlideEditorPanelProps) {
   const [title, setTitle] = useState(slide.title);
   const [layout, setLayout] = useState<SlideLayout>(slide.layout);
@@ -396,6 +399,191 @@ export function SlideEditorPanel({
     } finally {
       setGeneratingAltText(false);
     }
+  }
+
+  async function handleRewriteWithPreset(text: string) {
+    setRewriteInstructions(text);
+    setRewriting(true);
+    try {
+      const result = await rewriteSlide(slide.id, deckId, text);
+      const actionError = getActionError(result);
+      if (actionError) {
+        toast.error(actionError);
+        return;
+      }
+      if (!("generationId" in result) || !result.generationId) {
+        toast.error("Failed to start rewrite");
+        return;
+      }
+      toast.message("Improving slide…");
+      const { pollAiGeneration } = await import(
+        "@/lib/hooks/poll-ai-generation"
+      );
+      const done = await pollAiGeneration(deckId, result.generationId);
+      const rewritten = done.result as {
+        title?: string;
+        content?: Slide["content"];
+        speakerNotes?: string | null;
+      } | null;
+      if (!rewritten?.title || !rewritten.content) {
+        toast.error("Rewrite completed without slide data");
+        return;
+      }
+      toast.success("Slide updated");
+      setTitle(rewritten.title);
+      applyContentToFields(rewritten.content);
+      if (rewritten.speakerNotes) setSpeakerNotes(rewritten.speakerNotes);
+      const updated: Slide = {
+        ...slideRef.current,
+        title: rewritten.title,
+        content: rewritten.content,
+        speakerNotes: rewritten.speakerNotes ?? speakerNotes,
+      };
+      slideRef.current = updated;
+      onUpdate(updated);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Rewrite failed");
+    } finally {
+      setRewriting(false);
+    }
+  }
+
+  if (simple) {
+    return (
+      <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-medium">Edit slide</h3>
+          {saving ? (
+            <span className="text-xs text-muted-foreground">Saving…</span>
+          ) : lastSaved ? (
+            <span className="text-xs text-muted-foreground">Saved</span>
+          ) : null}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="slide-title">Title</Label>
+          <Input
+            id="slide-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+
+        {slots.includes("bullets") && (
+          <div className="space-y-2">
+            <Label htmlFor="slide-bullets">Content (one point per line)</Label>
+            <textarea
+              id="slide-bullets"
+              rows={5}
+              value={bullets}
+              onChange={(e) => setBullets(e.target.value)}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+        )}
+
+        {slots.includes("body") && !slots.includes("bullets") && (
+          <div className="space-y-2">
+            <Label htmlFor="slide-body">Content</Label>
+            <textarea
+              id="slide-body"
+              rows={4}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+        )}
+
+        {slots.includes("metrics") && (
+          <div className="space-y-2">
+            <Label htmlFor="slide-metrics">Metrics (Label | Value)</Label>
+            <textarea
+              id="slide-metrics"
+              rows={3}
+              value={metricsText}
+              onChange={(e) => setMetricsText(e.target.value)}
+              placeholder={"NPS | 72\nRevenue | $1.2M"}
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          {REWRITE_PRESETS.map((preset) => (
+            <Button
+              key={preset.label}
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={rewriting}
+              onClick={() => void handleRewriteWithPreset(preset.text)}
+            >
+              <Sparkles className="mr-1 h-3 w-3" />
+              {preset.label}
+            </Button>
+          ))}
+        </div>
+
+        <details className="rounded-md border border-border p-3 text-sm">
+          <summary className="cursor-pointer font-medium">More options</summary>
+          <div className="mt-3 space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="slide-layout-simple">Layout</Label>
+              <select
+                id="slide-layout-simple"
+                value={layout}
+                onChange={(e) =>
+                  handleLayoutChange(e.target.value as SlideLayout)
+                }
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+              >
+                {SLIDE_LAYOUTS.map((l) => (
+                  <option key={l} value={l}>
+                    {l.replace(/_/g, " ")}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <SlideVisualUpload
+              slide={slideRef.current}
+              deckId={deckId}
+              onAnnotateImage={onAnnotateImage}
+              onVisualReady={(updated) => {
+                setLayout(updated.layout);
+                layoutRef.current = updated.layout;
+                applyContentToFields(updated.content);
+                slideRef.current = updated;
+                onUpdate(updated);
+              }}
+            />
+
+            <div className="space-y-2">
+              <Label htmlFor="speaker-notes-simple">Presenter notes</Label>
+              <textarea
+                id="speaker-notes-simple"
+                rows={3}
+                value={speakerNotes}
+                onChange={(e) => setSpeakerNotes(e.target.value)}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
+            <SlideBackgroundPanel
+              slide={slide}
+              deckId={deckId}
+              slideCount={slideCount}
+              onBackgroundChange={(updated) => {
+                slideRef.current = updated;
+                onUpdate(updated);
+              }}
+              onBackgroundAppliedToAll={onBackgroundAppliedToAll}
+            />
+          </div>
+        </details>
+      </div>
+    );
   }
 
   return (

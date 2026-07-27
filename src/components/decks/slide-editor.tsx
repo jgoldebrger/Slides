@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Link2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
 import { refreshSlidesFromUpdates } from "@/lib/actions/decks";
@@ -12,14 +13,7 @@ import { SlideEditorPanel } from "@/components/slides/slide-editor-panel";
 import { SlideList } from "@/components/slides/slide-list";
 import { SlidePreview } from "@/components/slides/slide-preview";
 import { ImageAnnotatorModal } from "@/components/slides/image-annotator-modal";
-import { DeckRevisionPanel, type RevisionRow } from "@/components/decks/deck-revision-panel";
 import { DeckSharePanel, type ShareLinkRow } from "@/components/decks/deck-share-panel";
-import { DeckAiPanel } from "@/components/decks/deck-ai-panel";
-import { DeckCopilotWorkspace } from "@/components/decks/deck-copilot-workspace";
-import { AiContextInspector } from "@/components/decks/ai-context-inspector";
-import { ScopedRegeneratePanel } from "@/components/decks/scoped-regenerate-panel";
-import { AiInlineCitations } from "@/components/decks/ai-inline-citations";
-import { AiFeedbackButtons } from "@/components/decks/ai-feedback-buttons";
 import { RefreshDiffPanel } from "@/components/decks/refresh-diff-panel";
 import {
   addSlide,
@@ -27,8 +21,6 @@ import {
   reorderSlides,
 } from "@/lib/actions/slides";
 import type { Slide } from "@/types/slide";
-import type { DeckAudience } from "@/lib/ai/audience";
-import type { DeckQaResult } from "@/lib/ai/schemas/deck-ai";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -47,11 +39,7 @@ type SlideEditorProps = {
   brandTheme?: BrandPreviewTheme | null;
   deckBackgroundUrl?: string | null;
   initialShareLinks?: ShareLinkRow[];
-  initialRevisions?: RevisionRow[];
   deckStatus?: string;
-  initialAudience?: DeckAudience;
-  initialQa?: DeckQaResult | null;
-  initialAutoRefreshWeekly?: boolean;
   initialShareBlurb?: string | null;
 };
 
@@ -62,11 +50,7 @@ export function SlideEditor({
   brandTheme = null,
   deckBackgroundUrl = null,
   initialShareLinks = [],
-  initialRevisions = [],
   deckStatus = "ready",
-  initialAudience = "general",
-  initialQa = null,
-  initialAutoRefreshWeekly = false,
   initialShareBlurb = null,
 }: SlideEditorProps) {
   const router = useRouter();
@@ -76,6 +60,7 @@ export function SlideEditor({
   );
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [annotatorOpen, setAnnotatorOpen] = useState(false);
   const [refreshDiff, setRefreshDiff] = useState<RefreshDiff | null>(null);
@@ -83,7 +68,6 @@ export function SlideEditor({
   const prevStatusRef = useRef(deckStatus);
 
   const selectedSlide = slides.find((s) => s.id === selectedId) ?? null;
-
   const isGenerating = deckStatus === "generating";
 
   const changedSlideIds = new Set(
@@ -126,7 +110,7 @@ export function SlideEditor({
       setRefreshing(false);
       return;
     }
-    toast.success("Refreshing slides from project updates…");
+    toast.success("Updating slides from your latest project update…");
     router.refresh();
     setRefreshing(false);
   }, [deckId, router, isGenerating]);
@@ -142,15 +126,17 @@ export function SlideEditor({
 
       setSlides(reordered);
       const result = await reorderSlides(deckId, orderedIds);
-      const actionError = getActionError(result); if (actionError) { toast.error(actionError);
-      }
+      const actionError = getActionError(result);
+      if (actionError) toast.error(actionError);
     },
     [deckId, slides]
   );
 
   async function handleAddSlide() {
     const result = await addSlide(deckId);
-    const actionError = getActionError(result); if (actionError) { toast.error(actionError);
+    const actionError = getActionError(result);
+    if (actionError) {
+      toast.error(actionError);
       return;
     }
     toast.success("Slide added");
@@ -218,20 +204,42 @@ export function SlideEditor({
         onDismiss={() => setRefreshDiff(null)}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[240px_1fr_300px]">
-      <div className="space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-medium">Slides</h2>
-          <div className="flex gap-1">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => void handleRefreshFromUpdates()}
-              disabled={refreshing || isGenerating || slides.length === 0}
-              title="Re-fill slide content from the latest project updates"
-            >
-              {refreshing || isGenerating ? "Refreshing…" : "Refresh"}
-            </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => void handleRefreshFromUpdates()}
+          disabled={refreshing || isGenerating || slides.length === 0}
+        >
+          <RefreshCw className="mr-1.5 h-4 w-4" />
+          {refreshing || isGenerating ? "Updating…" : "Update from project"}
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setShareOpen(true)}>
+          <Link2 className="mr-1.5 h-4 w-4" />
+          Share
+        </Button>
+      </div>
+
+      <Dialog open={shareOpen} onOpenChange={setShareOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share deck</DialogTitle>
+            <DialogDescription>
+              Create a link for your team or stakeholders.
+            </DialogDescription>
+          </DialogHeader>
+          <DeckSharePanel
+            deckId={deckId}
+            initialLinks={initialShareLinks}
+            initialBlurb={initialShareBlurb}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <div className="grid gap-6 lg:grid-cols-[200px_1fr]">
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium">Slides</h2>
             <Button
               size="sm"
               variant="outline"
@@ -241,136 +249,93 @@ export function SlideEditor({
               Add
             </Button>
           </div>
+          {slides.length > 0 ? (
+            <SlideList
+              slides={slides}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onReorder={handleReorder}
+              changedSlideIds={changedSlideIds}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No slides yet.
+            </p>
+          )}
+          {selectedId && slides.length > 1 && (
+            <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+              <DialogTrigger asChild>
+                <Button size="sm" variant="ghost" className="w-full text-destructive">
+                  Delete slide
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Delete this slide?</DialogTitle>
+                  <DialogDescription>
+                    This cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button variant="destructive" onClick={handleDeleteSlide}>
+                    Delete
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          )}
         </div>
-        {slides.length > 0 ? (
-          <SlideList
-            slides={slides}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onReorder={handleReorder}
-            changedSlideIds={changedSlideIds}
-          />
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No slides yet. Approve an outline or click Add.
-          </p>
-        )}
-        {selectedId && slides.length > 1 && (
-          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="destructive" className="w-full">
-                Delete slide
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete this slide?</DialogTitle>
-                <DialogDescription>
-                  This action cannot be undone. The slide will be removed from
-                  the deck.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-                  Cancel
-                </Button>
-                <Button variant="destructive" onClick={handleDeleteSlide}>
-                  Delete
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        )}
 
-        <DeckSharePanel
-          deckId={deckId}
-          initialLinks={initialShareLinks}
-          initialBlurb={initialShareBlurb}
-        />
-        <DeckAiPanel
-          deckId={deckId}
-          slideId={selectedSlide?.id}
-          initialAudience={initialAudience}
-          initialQa={initialQa}
-          initialAutoRefreshWeekly={initialAutoRefreshWeekly}
-        />
-        <DeckCopilotWorkspace
-          deckId={deckId}
-          slideId={selectedSlide?.id}
-          onSelectSlide={setSelectedId}
-          onActionsComplete={() => router.refresh()}
-        />
-        <AiContextInspector deckId={deckId} />
-        <ScopedRegeneratePanel
-          deckId={deckId}
-          slideId={selectedSlide?.id}
-          onComplete={() => router.refresh()}
-        />
-        <DeckRevisionPanel
-          deckId={deckId}
-          initialRevisions={initialRevisions}
-        />
-      </div>
-
-      <div>
-        {selectedSlide ? (
-          <>
-            <SlidePreview
-              key={selectedSlide.id}
-              slide={selectedSlide}
-              applyBranding={applyBranding}
-              brandTheme={brandTheme}
-              deckBackgroundUrl={deckBackgroundUrl}
-              onImageClick={
-                selectedSlide.content.imageUrl
-                  ? () => setAnnotatorOpen(true)
-                  : undefined
-              }
-            />
-            {selectedSlide.content.imageUrl && (
-              <ImageAnnotatorModal
-                open={annotatorOpen}
-                onOpenChange={setAnnotatorOpen}
-                imageUrl={selectedSlide.content.imageUrl}
-                deckId={deckId}
+        <div className="space-y-4">
+          {selectedSlide ? (
+            <>
+              <SlidePreview
+                key={selectedSlide.id}
                 slide={selectedSlide}
-                onComplete={onSlideUpdate}
+                applyBranding={applyBranding}
+                brandTheme={brandTheme}
+                deckBackgroundUrl={deckBackgroundUrl}
+                onImageClick={
+                  selectedSlide.content.imageUrl
+                    ? () => setAnnotatorOpen(true)
+                    : undefined
+                }
               />
-            )}
-          </>
-        ) : (
-          <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-border bg-muted text-sm text-muted-foreground">
-            Select a slide to preview
-          </div>
-        )}
+              {selectedSlide.content.imageUrl && (
+                <ImageAnnotatorModal
+                  open={annotatorOpen}
+                  onOpenChange={setAnnotatorOpen}
+                  imageUrl={selectedSlide.content.imageUrl}
+                  deckId={deckId}
+                  slide={selectedSlide}
+                  onComplete={onSlideUpdate}
+                />
+              )}
+              <SlideEditorPanel
+                key={selectedSlide.id}
+                slide={selectedSlide}
+                deckId={deckId}
+                slideCount={slides.length}
+                onUpdate={onSlideUpdate}
+                onBackgroundAppliedToAll={onBackgroundAppliedToAll}
+                onAnnotateImage={
+                  selectedSlide.content.imageUrl
+                    ? () => setAnnotatorOpen(true)
+                    : undefined
+                }
+                simple
+              />
+            </>
+          ) : (
+            <div className="flex aspect-video items-center justify-center rounded-lg border border-dashed border-border bg-muted text-sm text-muted-foreground">
+              Select a slide to edit
+            </div>
+          )}
+        </div>
       </div>
-
-      <div>
-        {selectedSlide ? (
-          <div className="space-y-4">
-            <SlideEditorPanel
-              key={selectedSlide.id}
-              slide={selectedSlide}
-              deckId={deckId}
-              slideCount={slides.length}
-              onUpdate={onSlideUpdate}
-              onBackgroundAppliedToAll={onBackgroundAppliedToAll}
-              onAnnotateImage={
-                selectedSlide.content.imageUrl
-                  ? () => setAnnotatorOpen(true)
-                  : undefined
-              }
-            />
-            <AiInlineCitations deckId={deckId} slideId={selectedSlide.id} />
-            <AiFeedbackButtons deckId={deckId} slideId={selectedSlide.id} />
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-            Select a slide to edit
-          </div>
-        )}
-      </div>
-    </div>
     </div>
   );
 }

@@ -39,7 +39,7 @@ export default async function DecksPage() {
           description={
             isViewer
               ? "When your team shares decks, they will appear here."
-              : "Create a deck from a project to generate AI-powered slide outlines."
+              : "Create a deck in four steps — paste your update and we'll build the slides."
           }
           action={
             !isViewer ? (

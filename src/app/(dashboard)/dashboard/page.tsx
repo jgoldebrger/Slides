@@ -65,11 +65,11 @@ export default async function DashboardPage() {
 
       {!hasProjects ? (
         <EmptyState
-          title="No projects yet"
-          description="Create your first project to start capturing updates and building decks."
+          title="Create your first deck"
+          description="Start with a project name and a quick status update — we'll build the slides for you."
           action={
             <Button asChild>
-              <Link href="/projects/new">Create project</Link>
+              <Link href="/decks/new">Create deck</Link>
             </Button>
           }
         />
@@ -79,11 +79,11 @@ export default async function DashboardPage() {
             <CardTitle className="text-base">Quick actions</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Button asChild variant="outline">
-              <Link href="/projects/new">New project</Link>
+            <Button asChild>
+              <Link href="/decks/new">Create deck</Link>
             </Button>
             <Button asChild variant="outline">
-              <Link href="/decks/new">New deck</Link>
+              <Link href="/projects/new">New project</Link>
             </Button>
           </CardContent>
         </Card>

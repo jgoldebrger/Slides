@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
-import { NewDeckForm } from "@/components/decks/new-deck-form";
+import { DeckCreateWizard } from "@/components/decks/deck-create-wizard";
 import { LoadingState } from "@/components/shared/state";
 import { redirectIfViewer } from "@/lib/viewer-guard";
 import { getUserOrg } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "New deck" };
+export const metadata: Metadata = { title: "Create deck" };
 
 export default async function NewDeckPage() {
   await redirectIfViewer();
@@ -20,7 +20,7 @@ export default async function NewDeckPage() {
     .order("name");
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <Link
           href="/decks"
@@ -28,13 +28,13 @@ export default async function NewDeckPage() {
         >
           ← Decks
         </Link>
-        <h1 className="mt-2 text-xl font-semibold">New deck</h1>
+        <h1 className="mt-2 text-xl font-semibold">Create a deck</h1>
         <p className="text-muted-foreground">
-          Create a presentation deck from a project&apos;s updates.
+          Four simple steps — project, update, name, and we&apos;ll build the slides for you.
         </p>
       </div>
-      <Suspense fallback={<LoadingState message="Loading form…" />}>
-        <NewDeckForm projects={projects ?? []} />
+      <Suspense fallback={<LoadingState message="Loading…" />}>
+        <DeckCreateWizard projects={projects ?? []} />
       </Suspense>
     </div>
   );
