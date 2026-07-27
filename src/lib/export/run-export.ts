@@ -1,4 +1,4 @@
-import { getAppUrl } from "@/lib/app-url";
+import { getAppUrlFromEnv } from "@/lib/app-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   resolveBrandThemeFromKit,
@@ -148,7 +148,7 @@ export async function runExport(exportId: string, deckId: string) {
         const email = userData?.user?.email;
 
         if (email) {
-          const appUrl = getAppUrl();
+          const appUrl = getAppUrlFromEnv();
           await sendExportReadyEmail({
             to: email,
             deckName: deck.name,

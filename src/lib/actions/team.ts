@@ -128,7 +128,7 @@ export async function createTeamMember(payload: unknown) {
       return formError(toPublicError(inviteError, "Could not create invite"));
     }
 
-    const appUrl = getAppUrl();
+    const appUrl = await getAppUrl();
     const inviteUrl = `${appUrl}/invite/${token}`;
 
     const emailResult = await sendInviteEmail({

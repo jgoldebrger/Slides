@@ -88,7 +88,7 @@ export async function requestPasswordResetAction(email: string) {
     return { error: "Too many attempts. Try again later." };
   }
 
-  const appUrl = getAppUrl();
+  const appUrl = await getAppUrl();
   const supabase = await createClient();
   // Always return success to avoid email enumeration. Supabase sends the mail.
   await supabase.auth.resetPasswordForEmail(parsedEmail.data, {

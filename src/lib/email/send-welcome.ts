@@ -8,7 +8,7 @@ export async function sendWelcomeEmail({
   to: string;
   displayName?: string | null;
 }) {
-  const appUrl = getAppUrl();
+  const appUrl = await getAppUrl();
   const name = displayName?.trim() || "there";
   return sendEmail({
     to,

@@ -51,7 +51,7 @@ export async function createDeckShareLink(
   return {
     success: true as const,
     link: data,
-    url: shareViewUrl(token),
+    url: await shareViewUrl(token),
     // Token shown once — never stored in plaintext
     token,
   };

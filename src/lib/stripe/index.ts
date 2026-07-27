@@ -28,7 +28,7 @@ export async function createCheckoutSession({
     return { error: "Stripe is not configured" as const };
   }
 
-  const appUrl = getAppUrl();
+  const appUrl = await getAppUrl();
   const priceId = process.env.STRIPE_PRICE_ID;
 
   if (!priceId) {
@@ -53,7 +53,7 @@ export async function createBillingPortalSession(customerId: string) {
     return { error: "Stripe is not configured" as const };
   }
 
-  const appUrl = getAppUrl();
+  const appUrl = await getAppUrl();
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: `${appUrl}/settings`,

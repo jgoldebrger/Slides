@@ -9,6 +9,6 @@ export function hashShareToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-export function shareViewUrl(token: string) {
-  return `${getAppUrl()}/view/${token}`;
+export async function shareViewUrl(token: string) {
+  return `${await getAppUrl()}/view/${token}`;
 }
