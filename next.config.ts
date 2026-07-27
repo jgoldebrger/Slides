@@ -2,7 +2,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Slide image uploads allow up to 5MB; default Server Action limit is 1MB.
+  // Server Actions are capped at 4.5MB on Vercel; large uploads go direct to Supabase.
   experimental: {
     serverActions: {
       bodySizeLimit: "6mb",

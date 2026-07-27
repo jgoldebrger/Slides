@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
+import { clearDeckBackground } from "@/lib/actions/player";
 import {
-  clearDeckBackground,
-  uploadDeckBackgroundAudio,
-  uploadDeckBackgroundImage,
-} from "@/lib/actions/player";
+  uploadBackgroundAudioClient,
+  uploadBackgroundImageClient,
+} from "@/lib/player/upload-background-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,30 +28,50 @@ export function PlayerBackgroundSettings({
 
   async function handleAudio(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const fileInput = e.currentTarget.elements.namedItem(
+      "file"
+    ) as HTMLInputElement;
+    const file = fileInput.files?.[0];
+    if (!file) {
+      toast.error("Choose an audio file");
+      return;
+    }
     setUploadingAudio(true);
-    const result = await uploadDeckBackgroundAudio(
-      deckId,
-      new FormData(e.currentTarget)
-    );
-    const err = getActionError(result);
-    if (err) toast.error(err);
-    else toast.success("Background audio added");
-    setUploadingAudio(false);
-    (e.target as HTMLFormElement).reset();
+    try {
+      const result = await uploadBackgroundAudioClient(deckId, file);
+      const err = getActionError(result);
+      if (err) toast.error(err);
+      else toast.success("Background audio added");
+      (e.target as HTMLFormElement).reset();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadingAudio(false);
+    }
   }
 
   async function handleImage(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const fileInput = e.currentTarget.elements.namedItem(
+      "file"
+    ) as HTMLInputElement;
+    const file = fileInput.files?.[0];
+    if (!file) {
+      toast.error("Choose an image file");
+      return;
+    }
     setUploadingImage(true);
-    const result = await uploadDeckBackgroundImage(
-      deckId,
-      new FormData(e.currentTarget)
-    );
-    const err = getActionError(result);
-    if (err) toast.error(err);
-    else toast.success("Background image added");
-    setUploadingImage(false);
-    (e.target as HTMLFormElement).reset();
+    try {
+      const result = await uploadBackgroundImageClient(deckId, file);
+      const err = getActionError(result);
+      if (err) toast.error(err);
+      else toast.success("Background image added");
+      (e.target as HTMLFormElement).reset();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadingImage(false);
+    }
   }
 
   return (

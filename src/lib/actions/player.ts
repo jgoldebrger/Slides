@@ -2,33 +2,42 @@
 
 import { revalidatePath } from "next/cache";
 import { requireDeckEdit } from "@/lib/permissions";
+import {
+  deckBackgroundAudioPath,
+  deckBackgroundImagePath,
+  isDeckBackgroundStoragePath,
+  validateBackgroundAudioFile,
+  validateBackgroundImageFile,
+} from "@/lib/player/background-upload";
 import { getSignedStorageUrl } from "@/lib/storage/images";
 import { actionError, toPublicError } from "@/lib/errors/public-error";
 
-const MAX_AUDIO_BYTES = 15 * 1024 * 1024;
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export async function prepareDeckBackgroundAudioUpload(
+  deckId: string,
+  fileName: string,
+  contentType: string,
+  size: number
+) {
+  const validated = validateBackgroundAudioFile({
+    name: fileName,
+    type: contentType,
+    size,
+  } as File);
+  if ("error" in validated) return { error: validated.error };
 
-const AUDIO_TYPES = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav"];
-const IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+  const { deck } = await requireDeckEdit(deckId);
+  const path = deckBackgroundAudioPath(deck.org_id, deckId, fileName);
+  return { success: true as const, path };
+}
 
-export async function uploadDeckBackgroundAudio(deckId: string, formData: FormData) {
-  const file = formData.get("file") as File | null;
-  if (!file?.size) return { error: "No audio file provided" };
-  if (file.size > MAX_AUDIO_BYTES) return { error: "Audio must be under 15MB" };
-  if (!AUDIO_TYPES.includes(file.type)) {
-    return { error: "Only MP3 or WAV audio is allowed" };
-  }
-
+export async function completeDeckBackgroundAudioUpload(
+  deckId: string,
+  path: string
+) {
   const { supabase, deck } = await requireDeckEdit(deckId);
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "mp3";
-  const path = `${deck.org_id}/${deckId}/background/audio.${ext}`;
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const { error: uploadError } = await supabase.storage
-    .from("slide-assets")
-    .upload(path, buffer, { contentType: file.type, upsert: true });
-
-  if (uploadError) return actionError(toPublicError(uploadError, "Upload failed"));
+  if (!isDeckBackgroundStoragePath(deck.org_id, deckId, path, "audio")) {
+    return { error: "Invalid storage path" };
+  }
 
   const { error } = await supabase
     .from("decks")
@@ -42,27 +51,35 @@ export async function uploadDeckBackgroundAudio(deckId: string, formData: FormDa
 
   const url = await getSignedStorageUrl(supabase, "slide-assets", path);
   revalidatePath(`/decks/${deckId}/player`);
-  return { success: true, path, url };
+  return { success: true as const, path, url };
 }
 
-export async function uploadDeckBackgroundImage(deckId: string, formData: FormData) {
-  const file = formData.get("file") as File | null;
-  if (!file?.size) return { error: "No image file provided" };
-  if (file.size > MAX_IMAGE_BYTES) return { error: "Image must be under 5MB" };
-  if (!IMAGE_TYPES.includes(file.type)) {
-    return { error: "Only PNG, JPEG, and WebP images are allowed" };
-  }
+export async function prepareDeckBackgroundImageUpload(
+  deckId: string,
+  fileName: string,
+  contentType: string,
+  size: number
+) {
+  const validated = validateBackgroundImageFile({
+    name: fileName,
+    type: contentType,
+    size,
+  } as File);
+  if ("error" in validated) return { error: validated.error };
 
+  const { deck } = await requireDeckEdit(deckId);
+  const path = deckBackgroundImagePath(deck.org_id, deckId, fileName);
+  return { success: true as const, path };
+}
+
+export async function completeDeckBackgroundImageUpload(
+  deckId: string,
+  path: string
+) {
   const { supabase, deck } = await requireDeckEdit(deckId);
-  const ext = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
-  const path = `${deck.org_id}/${deckId}/background/image.${ext}`;
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const { error: uploadError } = await supabase.storage
-    .from("slide-assets")
-    .upload(path, buffer, { contentType: file.type, upsert: true });
-
-  if (uploadError) return actionError(toPublicError(uploadError, "Upload failed"));
+  if (!isDeckBackgroundStoragePath(deck.org_id, deckId, path, "image")) {
+    return { error: "Invalid storage path" };
+  }
 
   const { error } = await supabase
     .from("decks")
@@ -76,7 +93,63 @@ export async function uploadDeckBackgroundImage(deckId: string, formData: FormDa
 
   const url = await getSignedStorageUrl(supabase, "slide-assets", path);
   revalidatePath(`/decks/${deckId}/player`);
-  return { success: true, path, url };
+  return { success: true as const, path, url };
+}
+
+/** @deprecated Use uploadBackgroundAudioClient — Vercel limits request bodies to 4.5MB. */
+export async function uploadDeckBackgroundAudio(deckId: string, formData: FormData) {
+  const file = formData.get("file") as File | null;
+  const validated = validateBackgroundAudioFile(file);
+  if ("error" in validated) return { error: validated.error };
+
+  const prepared = await prepareDeckBackgroundAudioUpload(
+    deckId,
+    validated.file.name,
+    validated.file.type,
+    validated.file.size
+  );
+  if ("error" in prepared) return prepared;
+  if (!("path" in prepared)) return { error: "Upload failed" };
+
+  const { supabase } = await requireDeckEdit(deckId);
+  const buffer = Buffer.from(await validated.file.arrayBuffer());
+  const { error: uploadError } = await supabase.storage
+    .from("slide-assets")
+    .upload(prepared.path, buffer, {
+      contentType: validated.file.type,
+      upsert: true,
+    });
+
+  if (uploadError) return actionError(toPublicError(uploadError, "Upload failed"));
+  return completeDeckBackgroundAudioUpload(deckId, prepared.path);
+}
+
+/** @deprecated Use uploadBackgroundImageClient — Vercel limits request bodies to 4.5MB. */
+export async function uploadDeckBackgroundImage(deckId: string, formData: FormData) {
+  const file = formData.get("file") as File | null;
+  const validated = validateBackgroundImageFile(file);
+  if ("error" in validated) return { error: validated.error };
+
+  const prepared = await prepareDeckBackgroundImageUpload(
+    deckId,
+    validated.file.name,
+    validated.file.type,
+    validated.file.size
+  );
+  if ("error" in prepared) return prepared;
+  if (!("path" in prepared)) return { error: "Upload failed" };
+
+  const { supabase } = await requireDeckEdit(deckId);
+  const buffer = Buffer.from(await validated.file.arrayBuffer());
+  const { error: uploadError } = await supabase.storage
+    .from("slide-assets")
+    .upload(prepared.path, buffer, {
+      contentType: validated.file.type,
+      upsert: true,
+    });
+
+  if (uploadError) return actionError(toPublicError(uploadError, "Upload failed"));
+  return completeDeckBackgroundImageUpload(deckId, prepared.path);
 }
 
 export async function clearDeckBackground(deckId: string, type: "audio" | "image") {
