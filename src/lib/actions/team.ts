@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { getAppUrl } from "@/lib/app-url";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendInviteEmail } from "@/lib/email/send-invite";
 import { requireOrgAdmin, getUserOrg, requireUser } from "@/lib/permissions";
@@ -127,7 +128,7 @@ export async function createTeamMember(payload: unknown) {
       return formError(toPublicError(inviteError, "Could not create invite"));
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+    const appUrl = getAppUrl();
     const inviteUrl = `${appUrl}/invite/${token}`;
 
     const emailResult = await sendInviteEmail({

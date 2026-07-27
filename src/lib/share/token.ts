@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from "crypto";
+import { getAppUrl } from "@/lib/app-url";
 
 export function generateShareToken() {
   return randomBytes(32).toString("base64url");
@@ -9,6 +10,5 @@ export function hashShareToken(token: string) {
 }
 
 export function shareViewUrl(token: string) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-  return `${appUrl.replace(/\/$/, "")}/view/${token}`;
+  return `${getAppUrl()}/view/${token}`;
 }

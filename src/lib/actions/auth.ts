@@ -1,5 +1,6 @@
 "use server";
 
+import { getAppUrl } from "@/lib/app-url";
 import { createClient } from "@/lib/supabase/server";
 import { sendWelcomeEmail } from "@/lib/email/send-welcome";
 import { requireUser } from "@/lib/permissions";
@@ -87,7 +88,7 @@ export async function requestPasswordResetAction(email: string) {
     return { error: "Too many attempts. Try again later." };
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   const supabase = await createClient();
   // Always return success to avoid email enumeration. Supabase sends the mail.
   await supabase.auth.resetPasswordForEmail(parsedEmail.data, {

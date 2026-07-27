@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { getAppUrl } from "@/lib/app-url";
 
 let stripeClient: Stripe | null = null;
 
@@ -27,7 +28,7 @@ export async function createCheckoutSession({
     return { error: "Stripe is not configured" as const };
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   const priceId = process.env.STRIPE_PRICE_ID;
 
   if (!priceId) {
@@ -52,7 +53,7 @@ export async function createBillingPortalSession(customerId: string) {
     return { error: "Stripe is not configured" as const };
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: `${appUrl}/settings`,

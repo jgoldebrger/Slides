@@ -1,3 +1,4 @@
+import { getAppUrl } from "@/lib/app-url";
 import { sendEmail } from "@/lib/email/client";
 
 export async function sendWelcomeEmail({
@@ -7,7 +8,7 @@ export async function sendWelcomeEmail({
   to: string;
   displayName?: string | null;
 }) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const appUrl = getAppUrl();
   const name = displayName?.trim() || "there";
   return sendEmail({
     to,
