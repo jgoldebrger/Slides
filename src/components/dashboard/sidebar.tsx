@@ -20,13 +20,18 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
-const editorNav = [
+const editorNavBase = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/projects", label: "Projects", icon: FolderKanban },
   { href: "/decks", label: "Decks", icon: Presentation },
   { href: "/brand-kit", label: "Brand kit", icon: Palette },
-  { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+const settingsNavItem = {
+  href: "/settings",
+  label: "Settings",
+  icon: Settings,
+};
 
 const viewerNav = [
   { href: "/decks", label: "Presentations", icon: Presentation },
@@ -60,10 +65,11 @@ export function DashboardSidebar({
   const nav = isViewer
     ? viewerNav
     : [
-        ...editorNav,
+        ...editorNavBase,
         ...(canManageTeam
           ? [{ href: "/team", label: "Team", icon: Users }]
           : []),
+        settingsNavItem,
       ];
   const homeHref = isViewer ? "/decks" : "/dashboard";
 

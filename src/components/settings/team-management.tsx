@@ -108,10 +108,7 @@ export function TeamManagement({
     setRemoving(false);
   }
 
-  const assignableRoles =
-    actorRole === "owner"
-      ? ASSIGNABLE_ROLES
-      : ASSIGNABLE_ROLES.filter((r) => r !== "owner");
+  const assignableRoles = ASSIGNABLE_ROLES;
 
   return (
     <div className="space-y-6">
@@ -236,10 +233,7 @@ export function TeamManagement({
                   <select
                     value={member.role}
                     onChange={(e) => handleRoleChange(member, e.target.value)}
-                    disabled={
-                      savingId === member.id ||
-                      (member.role === "owner" && actorRole !== "owner")
-                    }
+                    disabled={savingId === member.id}
                     aria-label={`Role for ${member.email}`}
                     className="h-9 rounded-md border border-border bg-card px-2 text-sm"
                   >

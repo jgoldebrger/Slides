@@ -25,9 +25,8 @@ export type TeamMember = {
 };
 
 function canAssignRole(actorRole: string, targetRole: string): boolean {
-  if (actorRole === "owner") return true;
-  if (actorRole === "admin") {
-    return ["viewer", "member", "admin"].includes(targetRole);
+  if (actorRole === "owner" || actorRole === "admin") {
+    return ["viewer", "member", "admin", "owner"].includes(targetRole);
   }
   return false;
 }
@@ -131,13 +130,29 @@ export async function createTeamMember(payload: unknown) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
     const inviteUrl = `${appUrl}/invite/${token}`;
 
-    // Always email the invitee — notify_team_invites is for inviter alerts, not gating delivery
-    await sendInviteEmail({
+    const emailResult = await sendInviteEmail({
       to: normalizedEmail,
       displayName: display_name,
       orgName,
       inviteUrl,
     });
+
+    if ("skipped" in emailResult && emailResult.skipped) {
+      return {
+        error: {
+          _form: [
+            "Invite was created but email is not configured on this server (RESEND_API_KEY). Add the key in Vercel and redeploy.",
+          ],
+        },
+      };
+    }
+    if ("error" in emailResult && emailResult.error) {
+      return {
+        error: {
+          _form: [`Invite was created but the email could not be sent: ${emailResult.error}`],
+        },
+      };
+    }
 
     revalidatePath("/team");
     return { success: true, invited: true as const };
@@ -272,10 +287,6 @@ export async function updateTeamMember(payload: unknown) {
 
   if (role && !canAssignRole(actorRole, role)) {
     return { error: "You cannot assign that role" };
-  }
-
-  if (role === "owner" && actorRole !== "owner") {
-    return { error: "Only owners can assign the owner role" };
   }
 
   if (member.user_id === user.id && role && role !== member.role) {
