@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DeckExportBanner } from "@/components/decks/deck-export-banner";
 import { DeckGeneratingBanner } from "@/components/decks/deck-generating-banner";
+import { ApplyBrandingToggle } from "@/components/decks/apply-branding-toggle";
 import { DeckStatusBadge } from "@/components/decks/deck-status-badge";
 import { SlideEditor } from "@/components/decks/slide-editor";
 import { loadDeckBrandPreview } from "@/lib/brand/load-deck-brand";
@@ -126,6 +127,13 @@ export default async function DeckEditorPage({
         exportId={latestExport?.id ?? null}
         initialStatus={latestExport?.status ?? null}
       />
+
+      {mappedSlides.length > 0 ? (
+        <ApplyBrandingToggle
+          deckId={id}
+          initialValue={deck.apply_branding ?? true}
+        />
+      ) : null}
 
       {mappedSlides.length === 0 ? (
         <EmptyState
