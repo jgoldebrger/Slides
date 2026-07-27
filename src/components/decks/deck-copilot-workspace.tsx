@@ -17,8 +17,8 @@ import {
   sendCopilotMessage,
   setCopilotMode,
   setPinnedInstructions,
-  SLASH_COMMANDS,
 } from "@/lib/actions/ai-workspace";
+import { SLASH_COMMANDS } from "@/lib/ai/workspace/copilot";
 import { pollAiGeneration } from "@/lib/hooks/poll-ai-generation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

@@ -5,7 +5,6 @@ import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { z } from "zod";
 import { logAiActivity, listAiActivity } from "@/lib/ai/activity";
-import { parseCitations } from "@/lib/ai/citations";
 import { inferConfidenceFromCitations } from "@/lib/ai/confidence";
 import { contentFocusFromMetadata } from "@/lib/ai/load-deck-content-focus";
 import { normalizeProjectUpdatesForAi, prepareProjectUpdatesForDeck } from "@/lib/ai/project-updates-context";
@@ -36,15 +35,8 @@ import {
   type CopilotMode,
   type ContextSnapshot,
 } from "@/lib/ai/workspace/types";
+import { SLASH_COMMANDS } from "@/lib/ai/workspace/copilot";
 import type { DeckType } from "@/types/slide";
-
-const SLASH_COMMANDS: Record<string, string> = {
-  "/rewrite": "Rewrite the current slide to be clearer and shorter.",
-  "/factcheck": "Run a fact check on the current slide against project updates.",
-  "/notes": "Generate speaker notes for the current slide.",
-  "/export-brief": "Summarize this deck as a one-page executive brief.",
-  "/qa": "Run deck QA and list issues.",
-};
 
 async function updateDeckMetadata(
   supabase: Awaited<ReturnType<typeof requireDeckEdit>>["supabase"],
@@ -792,5 +784,3 @@ export async function getPresentModeScript(
     chapters,
   };
 }
-
-export { parseCitations, SLASH_COMMANDS };
