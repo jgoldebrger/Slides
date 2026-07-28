@@ -449,31 +449,32 @@ export function SlidePlayer({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [goTo, sorted.length, toggleFullscreen, togglePlay]);
 
+  const progressPercent =
+    sorted.length > 1 ? (index / (sorted.length - 1)) * 100 : 0;
+
+  const controlButtonClass = cn(
+    "text-background/90 hover:bg-background/10 hover:text-background",
+    isFullscreen && "text-background/90 hover:bg-background/10"
+  );
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-5">
       {!isFullscreen && (
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
             {shareMode ? (
               <p className="text-sm text-muted-foreground">Shared presentation</p>
             ) : (
               <Link
                 href={viewerMode ? "/decks" : `/decks/${deckId}/editor`}
-                className="rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="rounded-sm text-sm text-link/80 hover:text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {viewerMode ? "← Back to presentations" : "← Back to editor"}
               </Link>
             )}
-            <h1 className="mt-2 text-xl font-semibold tracking-tight">
+            <h1 className="mt-1 truncate text-lg font-semibold tracking-tight">
               {deckName}
             </h1>
-            <p className="text-sm text-muted-foreground">
-              {shareMode
-                ? "View-only link"
-                : viewerMode
-                  ? "Presentation"
-                  : "Slide player with AI voice"}
-            </p>
           </div>
           {!viewerMode && !shareMode && (
             <PlayerBackgroundSettings
@@ -493,15 +494,15 @@ export function SlidePlayer({
       <div
         ref={presentationRef}
         className={cn(
-          "flex flex-col",
-          isFullscreen && "fixed inset-0 z-50 bg-foreground p-4 sm:p-8"
+          "overflow-hidden rounded-xl border border-border shadow-lg",
+          isFullscreen && "fixed inset-0 z-50 flex flex-col rounded-none border-0 bg-foreground p-4 sm:p-6"
         )}
       >
         {isFullscreen && (
-          <div className="mb-4 flex shrink-0 items-center justify-between text-background">
+          <div className="mb-3 flex shrink-0 items-center justify-between text-background">
             <p className="truncate text-sm font-medium">{deckName}</p>
-            <p className="text-sm text-background/90">
-              Slide {index + 1} of {sorted.length}
+            <p className="text-sm text-background/80">
+              {index + 1} / {sorted.length}
               {narrationLoading ? " · Generating voice…" : ""}
             </p>
           </div>
@@ -509,61 +510,52 @@ export function SlidePlayer({
 
         <div
           className={cn(
-            "relative flex flex-1 flex-col overflow-hidden rounded-lg border border-border bg-card shadow-none",
-            isFullscreen && "border-background/20"
+            "bg-foreground",
+            isFullscreen ? "flex min-h-0 flex-1 flex-col" : ""
           )}
-          style={
-            backgroundImageUrl
-              ? {
-                  backgroundImage: `url(${backgroundImageUrl})`,
-                  backgroundSize: "cover",
-                  backgroundPosition: "center",
-                }
-              : undefined
-          }
         >
-          {backgroundImageUrl && (
-            <div
-              className={cn(
-                "absolute inset-0 bg-card/85",
-                isFullscreen && "bg-card/90"
-              )}
-              aria-hidden
-            />
-          )}
           <div
             className={cn(
-              "relative flex flex-1 items-center justify-center p-4 sm:p-6",
-              isFullscreen && "min-h-0"
+              "relative aspect-video w-full bg-black",
+              isFullscreen && "min-h-0 flex-1"
             )}
+            style={
+              backgroundImageUrl
+                ? {
+                    backgroundImage: `url(${backgroundImageUrl})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }
+                : undefined
+            }
           >
-            {current ? (
-              <SlidePreview
-                key={current.id}
-                slide={current}
-                applyBranding={applyBranding}
-                brandTheme={brandTheme}
-                className={cn(
-                  "mx-auto w-full max-w-4xl",
-                  isFullscreen && "max-h-full max-w-5xl"
-                )}
-              />
-            ) : (
-              <p className="py-20 text-center text-muted-foreground">
-                {shareMode
-                  ? "This presentation has no slides yet."
-                  : "No slides yet. Add a slide or generate from the outline."}
-              </p>
+            {backgroundImageUrl && (
+              <div className="absolute inset-0 bg-black/55" aria-hidden />
             )}
+            <div className="relative flex h-full items-center justify-center p-4 sm:p-8">
+              {current ? (
+                <SlidePreview
+                  key={current.id}
+                  slide={current}
+                  applyBranding={applyBranding}
+                  brandTheme={brandTheme}
+                  className={cn(
+                    "mx-auto w-full max-w-4xl shadow-2xl",
+                    isFullscreen && "max-h-full"
+                  )}
+                />
+              ) : (
+                <p className="text-center text-sm text-background/70">
+                  {shareMode
+                    ? "This presentation has no slides yet."
+                    : "No slides yet. Add a slide or generate from the outline."}
+                </p>
+              )}
+            </div>
           </div>
 
-          <div
-            className={cn(
-              "border-t border-border bg-card/95 px-4 py-3 backdrop-blur sm:px-6",
-              isFullscreen && "border-background/20 bg-foreground/95"
-            )}
-          >
-            <div className="mb-3">
+          <div className="border-t border-background/10 bg-foreground px-3 py-3 sm:px-4">
+            <div className="mb-3 px-1">
               <label className="sr-only" htmlFor="presentation-progress">
                 Presentation progress
               </label>
@@ -579,7 +571,10 @@ export function SlidePlayer({
                   setPlaying(false);
                   goTo(Number(e.target.value));
                 }}
-                className="h-6 w-full cursor-pointer accent-primary"
+                style={{
+                  background: `linear-gradient(to right, var(--link) ${progressPercent}%, color-mix(in oklch, var(--background) 25%, transparent) ${progressPercent}%)`,
+                }}
+                className="h-1.5 w-full cursor-pointer appearance-none rounded-full accent-link [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:bg-background [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-background"
                 aria-valuetext={
                   sorted.length
                     ? `Slide ${index + 1} of ${sorted.length}`
@@ -588,98 +583,71 @@ export function SlidePlayer({
               />
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  setPlaying(false);
-                  goTo(index - 1);
-                }}
-                disabled={index === 0}
-                aria-label="Previous slide"
-                className={cn(
-                  isFullscreen &&
-                    "border-background/30 bg-background/10 text-background hover:bg-background/20"
-                )}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                onClick={togglePlay}
-                className={cn(
-                  "gap-2 px-6",
-                  isFullscreen &&
-                    "bg-background text-foreground hover:bg-background/90"
-                )}
-              >
-                {playing ? (
-                  <>
-                    <Pause className="h-4 w-4" /> Pause
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" /> Play
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => {
-                  setPlaying(false);
-                  goTo(index + 1);
-                }}
-                disabled={index >= sorted.length - 1}
-                aria-label="Next slide"
-                className={cn(
-                  isFullscreen &&
-                    "border-background/30 bg-background/10 text-background hover:bg-background/20"
-                )}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setPlaying(false);
+                    goTo(index - 1);
+                  }}
+                  disabled={index === 0}
+                  aria-label="Previous slide"
+                  className={controlButtonClass}
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+                <Button
+                  onClick={togglePlay}
+                  size="icon"
+                  aria-label={playing ? "Pause" : "Play"}
+                  className="h-11 w-11 rounded-full bg-link text-primary-foreground hover:bg-link/90"
+                >
+                  {playing ? (
+                    <Pause className="h-5 w-5" />
+                  ) : (
+                    <Play className="h-5 w-5 translate-x-0.5" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    setPlaying(false);
+                    goTo(index + 1);
+                  }}
+                  disabled={index >= sorted.length - 1}
+                  aria-label="Next slide"
+                  className={controlButtonClass}
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </Button>
+              </div>
 
-              <span
-                className={cn(
-                  "min-w-[4rem] text-center text-sm text-muted-foreground",
-                  isFullscreen && "text-background/90"
-                )}
-              >
-                {sorted.length ? index + 1 : 0} / {sorted.length}
+              <span className="min-w-[3.5rem] text-sm tabular-nums text-background/80">
+                {sorted.length ? index + 1 : 0}/{sorted.length}
               </span>
 
-              <label
-                className={cn(
-                  "flex items-center gap-2 text-sm",
-                  isFullscreen && "text-background/90"
-                )}
-              >
-                <span className="hidden sm:inline">Speed</span>
+              <div className="hidden h-5 w-px bg-background/20 sm:block" aria-hidden />
+
+              <label className="flex items-center gap-2 text-sm text-background/80">
+                <span className="hidden md:inline">Speed</span>
                 <select
                   value={playbackSpeed}
                   onChange={(e) => setPlaybackSpeed(Number(e.target.value))}
-                  className={cn(
-                    "h-9 rounded-md border border-input bg-background px-2 text-sm",
-                    isFullscreen &&
-                      "border-background/30 bg-background/10 text-background"
-                  )}
+                  className="h-8 rounded-md border border-background/20 bg-background/10 px-2 text-sm text-background"
                   aria-label="Playback speed"
                 >
                   {SPEED_OPTIONS.map((speed) => (
-                    <option key={speed} value={speed}>
+                    <option key={speed} value={speed} className="text-foreground">
                       {speed}x
                     </option>
                   ))}
                 </select>
               </label>
 
-              <label
-                className={cn(
-                  "flex items-center gap-2 text-sm",
-                  isFullscreen && "text-background/90"
-                )}
-              >
+              <label className="flex items-center gap-2 text-sm text-background/80">
                 <input
                   type="checkbox"
                   checked={narrationEnabled}
@@ -687,64 +655,46 @@ export function SlidePlayer({
                     setNarrationEnabled(e.target.checked);
                     if (!e.target.checked) stopNarrationAudio();
                   }}
+                  className="accent-link"
                 />
                 AI reader
               </label>
 
-              {narrationEnabled && (
-                <label
-                  className={cn(
-                    "flex items-center gap-2 text-sm",
-                    isFullscreen && "text-background/90"
-                  )}
-                >
-                  <span className="hidden sm:inline">Voice</span>
+              {narrationEnabled ? (
+                <label className="flex items-center gap-2 text-sm text-background/80">
+                  <span className="hidden lg:inline">Voice</span>
                   <select
                     value={narrationVoice}
                     onChange={(e) => {
                       setNarrationVoice(e.target.value as AiTtsVoice);
                       if (playing) stopNarrationAudio();
                     }}
-                    className={cn(
-                      "h-9 max-w-[11rem] rounded-md border border-input bg-background px-2 text-sm sm:max-w-[14rem]",
-                      isFullscreen &&
-                        "border-background/30 bg-background/10 text-background"
-                    )}
+                    className="h-8 max-w-[10rem] rounded-md border border-background/20 bg-background/10 px-2 text-sm text-background lg:max-w-[12rem]"
                     aria-label="AI narration voice"
                   >
                     {AI_TTS_VOICES.map((voice) => (
-                      <option key={voice} value={voice}>
+                      <option key={voice} value={voice} className="text-foreground">
                         {AI_TTS_VOICE_LABELS[voice]}
                       </option>
                     ))}
                   </select>
                 </label>
-              )}
+              ) : null}
 
-              {narrationLoading && (
-                <span
-                  className={cn(
-                    "text-xs text-muted-foreground",
-                    isFullscreen && "text-background/90"
-                  )}
-                  aria-live="polite"
-                >
+              {narrationLoading ? (
+                <span className="text-xs text-background/70" aria-live="polite">
                   Generating voice…
                 </span>
-              )}
+              ) : null}
 
-              {backgroundAudioUrl && (
-                <>
+              {backgroundAudioUrl ? (
+                <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => setBgMuted((m) => !m)}
-                    aria-label={
-                      bgMuted ? "Unmute background" : "Mute background"
-                    }
-                    className={cn(
-                      isFullscreen && "text-background hover:bg-background/10"
-                    )}
+                    aria-label={bgMuted ? "Unmute background" : "Mute background"}
+                    className={controlButtonClass}
                   >
                     {bgMuted ? (
                       <VolumeX className="h-4 w-4" />
@@ -759,65 +709,54 @@ export function SlidePlayer({
                     step={0.05}
                     value={bgVolume}
                     onChange={(e) => setBgVolume(Number(e.target.value))}
-                    className="w-20 sm:w-24"
+                    className="w-16 accent-link sm:w-20"
                     aria-label="Background volume"
                   />
-                </>
-              )}
+                </div>
+              ) : null}
 
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => void toggleFullscreen()}
-                aria-label={
-                  isFullscreen ? "Exit fullscreen" : "Enter fullscreen"
-                }
-                className={cn(
-                  isFullscreen &&
-                    "border-background/30 bg-background/10 text-background hover:bg-background/20"
-                )}
-              >
-                {isFullscreen ? (
-                  <Minimize className="h-4 w-4" />
-                ) : (
-                  <Maximize className="h-4 w-4" />
-                )}
-              </Button>
+              <div className="ml-auto flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => void toggleFullscreen()}
+                  aria-label={
+                    isFullscreen ? "Exit fullscreen" : "Enter fullscreen"
+                  }
+                  className={controlButtonClass}
+                >
+                  {isFullscreen ? (
+                    <Minimize className="h-4 w-4" />
+                  ) : (
+                    <Maximize className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
-
-            <p
-              className={cn(
-                "mt-2 hidden text-center text-xs text-muted-foreground sm:block",
-                isFullscreen && "text-background/90"
-              )}
-            >
-              Shortcuts: ← → navigate · Space play/pause · F fullscreen ·
-              Home/End first/last
-            </p>
           </div>
         </div>
       </div>
 
       {!isFullscreen && current && narrationEnabled && (
         <div
-          className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-foreground"
+          className="rounded-lg border border-link/20 bg-[var(--color-brand-100)]/50 px-4 py-3 text-sm"
           aria-live="polite"
         >
-          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            AI reader script
+          <p className="text-xs font-medium uppercase tracking-wide text-link/70">
+            Now reading
           </p>
-          <p className="mt-1 line-clamp-3">{buildSlideNarration(current)}</p>
+          <p className="mt-1 line-clamp-2 text-foreground">
+            {buildSlideNarration(current)}
+          </p>
         </div>
       )}
 
-      {!isFullscreen && !shareMode && (
-        <AiPresentPanel deckId={deckId} slideIndex={index} />
-      )}
-
-      {!isFullscreen && (
+      {!isFullscreen && sorted.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-foreground">Slides</p>
-          <div className="flex gap-3 overflow-x-auto pb-2">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Slides
+          </p>
+          <div className="flex gap-2 overflow-x-auto pb-1">
             {sorted.map((slide, i) => (
               <button
                 key={slide.id}
@@ -829,20 +768,24 @@ export function SlidePlayer({
                 aria-current={i === index ? "true" : undefined}
                 aria-label={`Go to slide ${i + 1}: ${slide.title || "Untitled"}`}
                 className={cn(
-                  "min-w-[140px] shrink-0 rounded-lg border p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  "min-w-[120px] shrink-0 rounded-md border px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   i === index
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-card hover:border-muted-foreground/40"
+                    ? "border-link bg-link text-primary-foreground"
+                    : "border-link/20 bg-[var(--color-brand-50)] hover:border-link/40"
                 )}
               >
-                <span className="text-xs opacity-80">Slide {i + 1}</span>
-                <p className="mt-1 line-clamp-2 text-sm font-medium">
+                <span className="text-[11px] opacity-80">{i + 1}</span>
+                <p className="mt-0.5 line-clamp-2 text-sm font-medium">
                   {slide.title || "Untitled"}
                 </p>
               </button>
             ))}
           </div>
         </div>
+      )}
+
+      {!isFullscreen && !shareMode && (
+        <AiPresentPanel deckId={deckId} slideIndex={index} />
       )}
     </div>
   );

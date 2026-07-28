@@ -2,7 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { DeckListRow } from "@/components/decks/deck-list-row";
-import { Input } from "@/components/ui/input";
+import {
+  EntityListEmpty,
+  EntityListPanel,
+  EntityListSearchToolbar,
+} from "@/components/shared/entity-list";
 import {
   SEARCH_DEBOUNCE_MS,
   useDebouncedValue,
@@ -14,6 +18,7 @@ type DeckItem = {
   type: string;
   status: string;
   projectName?: string;
+  updated_at?: string;
 };
 
 type DeckListProps = {
@@ -36,25 +41,33 @@ export function DeckList({ decks, isViewer }: DeckListProps) {
     );
   }, [decks, debouncedQuery]);
 
+  const noun = isViewer ? "presentation" : "deck";
+  const countLabel = `${filtered.length} ${noun}${filtered.length === 1 ? "" : "s"}`;
+
   return (
-    <div className="space-y-3">
-      <Input
-        type="search"
+    <div className="space-y-4">
+      <EntityListSearchToolbar
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={setQuery}
         placeholder={isViewer ? "Search presentations…" : "Search decks…"}
-        aria-label={isViewer ? "Search presentations" : "Search decks"}
+        ariaLabel={isViewer ? "Search presentations" : "Search decks"}
+        countLabel={countLabel}
       />
+
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          No decks match your search.
-        </p>
+        <EntityListEmpty
+          message={
+            isViewer
+              ? "No presentations match your search."
+              : "No decks match your search."
+          }
+        />
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+        <EntityListPanel>
           {filtered.map((deck) => (
             <DeckListRow key={deck.id} deck={deck} isViewer={isViewer} />
           ))}
-        </ul>
+        </EntityListPanel>
       )}
     </div>
   );

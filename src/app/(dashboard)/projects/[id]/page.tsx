@@ -8,6 +8,14 @@ import { requireProjectAccess } from "@/lib/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import {
+  EntityListMeta,
+  EntityListPanel,
+  EntityListPrimary,
+  EntityListRow,
+  EntityListTrailing,
+  formatListDate,
+} from "@/components/shared/entity-list";
+import {
   Card,
   CardContent,
   CardDescription,
@@ -100,26 +108,27 @@ export default async function ProjectPage({
       </div>
 
       {decks && decks.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-medium">Recent decks</h2>
-          <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+        <div className="space-y-4">
+          <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            Recent decks
+          </h2>
+          <EntityListPanel>
             {decks.map((deck) => (
-              <li key={deck.id}>
-                <Link
+              <EntityListRow key={deck.id}>
+                <EntityListPrimary
                   href={deckPrimaryHref(deck.id, deck.status, false)}
-                  className="flex items-center justify-between px-6 py-4 hover:bg-muted/40"
-                >
-                  <div>
-                    <p className="font-medium">{deck.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {deckTypeLabel(deck.type)}
-                    </p>
-                  </div>
+                  title={deck.name}
+                  subtitle={deckTypeLabel(deck.type)}
+                />
+                <EntityListTrailing>
                   <DeckStatusBadge status={deck.status} />
-                </Link>
-              </li>
+                  <EntityListMeta>
+                    {formatListDate(deck.updated_at)}
+                  </EntityListMeta>
+                </EntityListTrailing>
+              </EntityListRow>
             ))}
-          </ul>
+          </EntityListPanel>
         </div>
       )}
     </div>

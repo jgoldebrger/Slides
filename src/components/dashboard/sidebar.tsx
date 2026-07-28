@@ -17,6 +17,7 @@ import {
   Bot,
 } from "lucide-react";
 import { OrgSwitcher } from "@/components/dashboard/org-switcher";
+import { Logo } from "@/components/shared/logo";
 import type { UserOrg } from "@/lib/org-context";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -42,8 +43,16 @@ const viewerNav = [
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
+function userInitials(email: string) {
+  const local = email.split("@")[0] ?? "";
+  const parts = local.split(/[._-]+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();
+  }
+  return local.slice(0, 2).toUpperCase();
+}
+
 export function DashboardSidebar({
-  orgName,
   userEmail,
   isViewer = false,
   canManageTeam = false,
@@ -51,7 +60,6 @@ export function DashboardSidebar({
   orgs = [],
   activeOrgId = "",
 }: {
-  orgName: string;
   userEmail: string;
   isViewer?: boolean;
   canManageTeam?: boolean;
@@ -146,33 +154,33 @@ export function DashboardSidebar({
 
   const navContent = (
     <>
-      <div className="border-b border-border px-4 py-4">
-        <div className="flex items-center justify-between gap-2">
-          <Link
+      <div className="border-b border-link/15 px-4 py-6">
+        <div className="relative flex items-center justify-center">
+          <Logo
             href={homeHref}
-            className="rounded-sm text-base font-semibold tracking-tight text-link focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            size="lg"
             onClick={() => setMobileOpen(false)}
-          >
-            UpdateDeck
-          </Link>
+          />
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="min-h-10 min-w-10 md:hidden"
+            className="absolute right-0 min-h-10 min-w-10 md:hidden"
             onClick={() => setMobileOpen(false)}
             aria-label="Close navigation"
           >
             <X className="h-5 w-5" />
           </Button>
         </div>
-        <p className="mt-1 truncate text-xs text-muted-foreground">{orgName}</p>
         <OrgSwitcher orgs={orgs} activeOrgId={activeOrgId || orgs[0]?.id || ""} />
         {isViewer && (
-          <p className="mt-1 text-xs text-muted-foreground">Viewer</p>
+          <p className="mt-1 text-center text-xs text-link/70">Viewer</p>
         )}
       </div>
-      <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 py-3" aria-label="Main">
+      <nav
+        className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4"
+        aria-label="Main"
+      >
         {nav.map(({ href, label, icon: Icon }) => {
           const active =
             pathname === href || pathname.startsWith(`${href}/`);
@@ -183,10 +191,10 @@ export function DashboardSidebar({
               aria-current={active ? "page" : undefined}
               onClick={() => setMobileOpen(false)}
               className={cn(
-                "relative flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "flex min-h-10 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 active
-                  ? "bg-muted text-link before:absolute before:left-0 before:top-1 before:bottom-1 before:w-0.5 before:rounded-full before:bg-link"
-                  : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  ? "bg-link text-primary-foreground shadow-none"
+                  : "text-link/75 hover:bg-link/10 hover:text-link"
               )}
             >
               <Icon className="h-4 w-4 shrink-0" aria-hidden />
@@ -195,24 +203,46 @@ export function DashboardSidebar({
           );
         })}
       </nav>
-      <div className="border-t border-border p-3">
-        <p className="truncate text-xs text-muted-foreground">{userEmail}</p>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="mt-2 w-full justify-start gap-2"
-          onClick={signOut}
-        >
-          <LogOut className="h-4 w-4" aria-hidden />
-          Sign out
-        </Button>
+      <div className="border-t border-link/15 bg-link/5 p-3">
+        <div className="flex items-center gap-2 rounded-lg border border-link/15 bg-[var(--color-brand-100)]/80 p-2">
+          <Link
+            href="/settings/account"
+            onClick={() => setMobileOpen(false)}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-md p-1 transition-colors hover:bg-link/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-link/15 text-xs font-semibold text-link"
+              aria-hidden
+            >
+              {userInitials(userEmail)}
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-medium text-link">
+                {userEmail.split("@")[0]}
+              </span>
+              <span className="block truncate text-xs text-link/65">
+                {userEmail}
+              </span>
+            </span>
+          </Link>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 shrink-0 text-link/70 hover:bg-link/10 hover:text-link"
+            onClick={signOut}
+            aria-label="Sign out"
+          >
+            <LogOut className="h-4 w-4" aria-hidden />
+          </Button>
+        </div>
       </div>
     </>
   );
 
   return (
     <>
-      <div className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-card px-4 py-3 md:hidden">
+      <div className="sticky top-0 z-40 flex items-center gap-3 border-b border-link/15 bg-raised px-4 py-3 md:hidden">
         <Button
           ref={menuButtonRef}
           type="button"
@@ -227,12 +257,7 @@ export function DashboardSidebar({
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <Link
-          href={homeHref}
-          className="rounded-sm font-semibold tracking-tight focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          UpdateDeck
-        </Link>
+        <Logo href={homeHref} size="md" />
       </div>
 
       {mobileOpen && (
@@ -252,7 +277,7 @@ export function DashboardSidebar({
         aria-modal={mobileOpen || undefined}
         aria-label={mobileOpen ? "Navigation" : undefined}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex h-screen w-56 shrink-0 flex-col border-r border-border bg-card transition-transform md:sticky md:top-0 md:z-auto md:max-h-screen md:self-start md:overflow-hidden",
+          "fixed inset-y-0 left-0 z-50 flex h-screen w-60 shrink-0 flex-col border-r border-link/15 bg-raised transition-transform md:sticky md:top-0 md:z-auto md:max-h-screen md:self-start md:overflow-hidden",
           mobileOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0",
           mobileNavClosed && "invisible pointer-events-none"
         )}

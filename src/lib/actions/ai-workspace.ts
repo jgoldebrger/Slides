@@ -717,7 +717,7 @@ export async function updateAiConnector(
     .eq("org_id", orgId)
     .eq("connector_type", connectorType);
   if (error) return actionError(toPublicError(error));
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   return { success: true as const };
 }
 

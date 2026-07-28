@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { PageLoader } from "@/components/shared/page-loader";
 
 export function EmptyState({
   title,
@@ -14,7 +15,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/40 px-4 py-12 text-center",
+        "flex flex-col items-center justify-center rounded-lg border border-dashed border-link/25 bg-[var(--color-brand-100)]/50 px-4 py-12 text-center",
         className
       )}
     >
@@ -27,18 +28,14 @@ export function EmptyState({
   );
 }
 
-export function LoadingState({ message = "Loading…" }: { message?: string }) {
-  return (
-    <div className="flex items-center justify-center py-16" role="status">
-      <div className="flex items-center gap-3 text-sm text-muted-foreground">
-        <span
-          className="h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-foreground"
-          aria-hidden
-        />
-        {message}
-      </div>
-    </div>
-  );
+export function LoadingState({
+  message = "Loading…",
+  fullPage = false,
+}: {
+  message?: string;
+  fullPage?: boolean;
+}) {
+  return <PageLoader message={message} fullPage={fullPage} />;
 }
 
 export function ErrorState({

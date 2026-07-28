@@ -305,7 +305,6 @@ export function SlideEditor({
           {selectedSlide ? (
             <>
               <SlidePreview
-                key={selectedSlide.id}
                 slide={selectedSlide}
                 applyBranding={applyBranding}
                 brandTheme={brandTheme}

@@ -15,9 +15,5 @@ export default async function ResetPasswordPage() {
     redirect("/forgot-password");
   }
 
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
-      <ResetPasswordForm />
-    </main>
-  );
+  return <ResetPasswordForm />;
 }

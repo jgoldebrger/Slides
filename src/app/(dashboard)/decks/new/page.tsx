@@ -33,7 +33,7 @@ export default async function NewDeckPage() {
           Four simple steps — project, update, name, and we&apos;ll build the slides for you.
         </p>
       </div>
-      <Suspense fallback={<LoadingState message="Loading…" />}>
+      <Suspense fallback={<LoadingState message="Loading…" fullPage />}>
         <DeckCreateWizard projects={projects ?? []} />
       </Suspense>
     </div>

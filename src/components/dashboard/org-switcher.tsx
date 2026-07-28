@@ -35,7 +35,7 @@ export function OrgSwitcher({ orgs, activeOrgId }: OrgSwitcherProps) {
       value={activeOrgId}
       disabled={pending}
       onChange={(e) => handleChange(e.target.value)}
-      className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1 text-xs text-muted-foreground"
+      className="mt-3 w-full rounded-md border border-link/20 bg-[var(--color-brand-50)] px-2 py-1 text-xs text-link/80"
     >
       {orgs.map((org) => (
         <option key={org.id} value={org.id}>

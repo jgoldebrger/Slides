@@ -7,6 +7,14 @@ import { getActionError } from "@/lib/action-result";
 import { listAiAgents, runAiAgent, updateAiAgent } from "@/lib/actions/ai-workspace";
 import { Button } from "@/components/ui/button";
 import type { AgentType } from "@/lib/ai/workspace/types";
+import {
+  EntityListMeta,
+  EntityListPanel,
+  EntityListPrimary,
+  EntityListRow,
+  EntityListTrailing,
+  formatListDate,
+} from "@/components/shared/entity-list";
 
 type AgentRow = {
   id: string;
@@ -110,20 +118,28 @@ export function AiAgentsDashboard() {
       </div>
 
       <div>
-        <h3 className="mb-2 font-medium">Recent runs</h3>
-        <ul className="divide-y divide-border rounded-lg border border-border">
-          {runs.slice(0, 10).map((run) => (
-            <li key={run.id} className="flex justify-between gap-2 p-3 text-sm">
-              <span>{run.summary ?? run.status}</span>
-              <span className="text-xs text-muted-foreground">
-                {new Date(run.started_at).toLocaleString()}
-              </span>
-            </li>
-          ))}
-          {!runs.length && (
-            <li className="p-4 text-sm text-muted-foreground">No runs yet.</li>
-          )}
-        </ul>
+        <h3 className="mb-4 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+          Recent runs
+        </h3>
+        {runs.length ? (
+          <EntityListPanel>
+            {runs.slice(0, 10).map((run) => (
+              <EntityListRow key={run.id}>
+                <EntityListPrimary
+                  title={run.summary ?? run.status}
+                  subtitle={run.status}
+                />
+                <EntityListTrailing>
+                  <EntityListMeta className="inline">
+                    {formatListDate(run.started_at)}
+                  </EntityListMeta>
+                </EntityListTrailing>
+              </EntityListRow>
+            ))}
+          </EntityListPanel>
+        ) : (
+          <p className="text-sm text-muted-foreground">No runs yet.</p>
+        )}
       </div>
     </div>
   );

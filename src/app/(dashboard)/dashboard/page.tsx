@@ -1,28 +1,25 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import Link from "next/link";
+import { DashboardHome } from "@/components/dashboard/dashboard-home";
 import { getOrgContext } from "@/lib/viewer-guard";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { EmptyState } from "@/components/shared/state";
-import { PageHeader } from "@/components/shared/page-header";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
 export default async function DashboardPage() {
-  const { orgId, isViewer } = await getOrgContext();
+  const { orgId, isViewer, orgName, user } = await getOrgContext();
   if (isViewer) redirect("/decks");
 
   const supabase = await createClient();
 
-  const [{ count: projectCount }, { count: deckCount }] = await Promise.all([
+  const [
+    { count: projectCount },
+    { count: deckCount },
+    { count: readyDeckCount },
+    { data: recentDecks },
+    { data: recentProjects },
+    { data: profile },
+  ] = await Promise.all([
     supabase
       .from("projects")
       .select("*", { count: "exact", head: true })
@@ -31,63 +28,55 @@ export default async function DashboardPage() {
       .from("decks")
       .select("*", { count: "exact", head: true })
       .eq("org_id", orgId),
+    supabase
+      .from("decks")
+      .select("*", { count: "exact", head: true })
+      .eq("org_id", orgId)
+      .eq("status", "ready"),
+    supabase
+      .from("decks")
+      .select("id, name, status, type, updated_at, projects(name)")
+      .eq("org_id", orgId)
+      .order("updated_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("projects")
+      .select("id, name, status, updated_at")
+      .eq("org_id", orgId)
+      .order("updated_at", { ascending: false })
+      .limit(5),
+    supabase
+      .from("profiles")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle(),
   ]);
 
-  const hasProjects = (projectCount ?? 0) > 0;
-
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        description="Create project updates and turn them into presentation decks."
-      />
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Projects</CardTitle>
-            <CardDescription>Active project workspaces</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{projectCount ?? 0}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Decks</CardTitle>
-            <CardDescription>Presentation decks created</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-semibold">{deckCount ?? 0}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {!hasProjects ? (
-        <EmptyState
-          title="Create your first deck"
-          description="Start with a project name and a quick status update — we'll build the slides for you."
-          action={
-            <Button asChild>
-              <Link href="/decks/new">Create deck</Link>
-            </Button>
-          }
-        />
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Quick actions</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-3">
-            <Button asChild>
-              <Link href="/decks/new">Create deck</Link>
-            </Button>
-            <Button asChild variant="outline">
-              <Link href="/projects/new">New project</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+    <DashboardHome
+      displayName={profile?.display_name ?? ""}
+      orgName={orgName}
+      projectCount={projectCount ?? 0}
+      deckCount={deckCount ?? 0}
+      readyDeckCount={readyDeckCount ?? 0}
+      recentDecks={(recentDecks ?? []).map((deck) => {
+        const raw = deck.projects as { name: string } | { name: string }[] | null;
+        const project = Array.isArray(raw) ? raw[0] : raw;
+        return {
+          id: deck.id,
+          name: deck.name,
+          status: deck.status,
+          type: deck.type,
+          updatedAt: deck.updated_at,
+          projectName: project?.name,
+        };
+      })}
+      recentProjects={(recentProjects ?? []).map((project) => ({
+        id: project.id,
+        name: project.name,
+        status: project.status,
+        updatedAt: project.updated_at,
+      }))}
+    />
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
+import { ProjectStatusBadge } from "@/components/projects/project-status-badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,6 +10,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  EntityListMeta,
+  EntityListPrimary,
+  EntityListRow,
+  EntityListTrailing,
+  entityListMenuButtonClass,
+  formatListDate,
+} from "@/components/shared/entity-list";
 
 type ProjectListRowProps = {
   project: {
@@ -16,29 +25,35 @@ type ProjectListRowProps = {
     name: string;
     description?: string | null;
     status: string;
+    updated_at: string;
   };
 };
 
 export function ProjectListRow({ project }: ProjectListRowProps) {
+  const updatedLabel = formatListDate(project.updated_at);
+
   return (
-    <li className="flex items-center justify-between gap-2 px-4 py-3 hover:bg-muted/60">
-      <Link href={`/projects/${project.id}`} className="min-w-0 flex-1">
-        <p className="font-medium">{project.name}</p>
-        {project.description && (
-          <p className="text-sm text-muted-foreground line-clamp-1">
-            {project.description}
-          </p>
-        )}
-      </Link>
-      <div className="flex items-center gap-2">
-        <span className="hidden text-xs capitalize text-muted-foreground sm:inline">
-          {project.status}
-        </span>
+    <EntityListRow>
+      <EntityListPrimary
+        href={`/projects/${project.id}`}
+        title={project.name}
+        subtitle={
+          project.description
+            ? project.description
+            : `Updated ${updatedLabel}`
+        }
+      />
+      <EntityListTrailing>
+        <ProjectStatusBadge status={project.status} />
+        {project.description ? (
+          <EntityListMeta>{updatedLabel}</EntityListMeta>
+        ) : null}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
               size="icon"
+              className={entityListMenuButtonClass}
               aria-label={`Actions for ${project.name}`}
             >
               <MoreHorizontal className="h-4 w-4" />
@@ -56,7 +71,7 @@ export function ProjectListRow({ project }: ProjectListRowProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </div>
-    </li>
+      </EntityListTrailing>
+    </EntityListRow>
   );
 }

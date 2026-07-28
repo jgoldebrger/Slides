@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plug } from "lucide-react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
 import { listAiConnectors, updateAiConnector } from "@/lib/actions/ai-workspace";
+import {
+  EntityListPanel,
+  EntityListPrimary,
+  EntityListRow,
+  EntityListTrailing,
+} from "@/components/shared/entity-list";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ConnectorType } from "@/lib/ai/workspace/types";
@@ -20,6 +25,8 @@ type ConnectorRow = {
 export function AiConnectorsPanel() {
   const [connectors, setConnectors] = useState<ConnectorRow[]>([]);
   const [configs, setConfigs] = useState<Record<string, string>>({});
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   async function load() {
     const result = await listAiConnectors();
@@ -41,6 +48,7 @@ export function AiConnectorsPanel() {
   }, []);
 
   async function save(connector: ConnectorRow) {
+    setSavingId(connector.id);
     const result = await updateAiConnector(connector.connector_type, {
       enabled: connector.enabled,
       name: connector.name,
@@ -49,54 +57,85 @@ export function AiConnectorsPanel() {
     const err = getActionError(result);
     if (err) toast.error(err);
     else toast.success(`${connector.name} saved`);
+    setSavingId(null);
+  }
+
+  function toggleEnabled(connector: ConnectorRow) {
+    setConnectors((prev) =>
+      prev.map((row) =>
+        row.id === connector.id ? { ...row, enabled: !row.enabled } : row
+      )
+    );
+  }
+
+  if (connectors.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        No connectors configured yet.
+      </p>
+    );
   }
 
   return (
-    <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
-        Connect intake sources. Paste webhook URLs or API keys (stored per org).
-      </p>
-      {connectors.map((c) => (
-        <div
-          key={c.id}
-          className="rounded-lg border border-border bg-card p-4"
-        >
-          <div className="mb-2 flex items-center justify-between">
-            <h3 className="flex items-center gap-1.5 font-medium">
-              <Plug className="h-4 w-4" />
-              {c.name}
-            </h3>
-            <label className="flex items-center gap-1 text-xs">
-              <input
-                type="checkbox"
-                checked={c.enabled}
-                onChange={() =>
-                  setConnectors((prev) =>
-                    prev.map((row) =>
-                      row.id === c.id ? { ...row, enabled: !row.enabled } : row
-                    )
-                  )
-                }
+    <EntityListPanel>
+      {connectors.map((connector) => {
+        const expanded = expandedId === connector.id;
+        return (
+          <EntityListRow
+            key={connector.id}
+            className="flex-col items-stretch gap-3"
+          >
+            <div className="flex w-full items-center gap-3">
+              <EntityListPrimary
+                title={connector.name}
+                subtitle={connector.enabled ? "Connected" : "Disabled"}
               />
-              Enabled
-            </label>
-          </div>
-          <Input
-            value={configs[c.connector_type] ?? ""}
-            onChange={(e) =>
-              setConfigs((prev) => ({
-                ...prev,
-                [c.connector_type]: e.target.value,
-              }))
-            }
-            placeholder={`${c.connector_type} webhook or channel URL`}
-            className="mb-2"
-          />
-          <Button size="sm" onClick={() => void save(c)}>
-            Save connector
-          </Button>
-        </div>
-      ))}
-    </div>
+              <EntityListTrailing>
+                <label className="flex items-center gap-1.5 text-xs text-link/80">
+                  <input
+                    type="checkbox"
+                    checked={connector.enabled}
+                    onChange={() => toggleEnabled(connector)}
+                  />
+                  On
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    setExpandedId(expanded ? null : connector.id)
+                  }
+                >
+                  {expanded ? "Hide" : "Configure"}
+                </Button>
+              </EntityListTrailing>
+            </div>
+            {expanded ? (
+              <div className="space-y-2 border-t border-link/15 pt-3">
+                <Input
+                  value={configs[connector.connector_type] ?? ""}
+                  onChange={(e) =>
+                    setConfigs((prev) => ({
+                      ...prev,
+                      [connector.connector_type]: e.target.value,
+                    }))
+                  }
+                  placeholder={`${connector.connector_type} webhook or channel URL`}
+                  className="border-link/20 bg-[var(--color-brand-50)]"
+                />
+                <Button
+                  size="sm"
+                  disabled={savingId === connector.id}
+                  onClick={() => void save(connector)}
+                >
+                  {savingId === connector.id ? "Saving…" : "Save connector"}
+                </Button>
+              </div>
+            ) : null}
+          </EntityListRow>
+        );
+      })}
+    </EntityListPanel>
   );
 }

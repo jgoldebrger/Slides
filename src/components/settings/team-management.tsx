@@ -30,6 +30,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { ASSIGNABLE_ROLES } from "@/lib/roles";
+import {
+  EntityListPanel,
+  EntityListRow,
+} from "@/components/shared/entity-list";
 
 const roleLabels: Record<string, string> = {
   viewer: "Viewer (presentations only)",
@@ -211,11 +215,11 @@ export function TeamManagement({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="divide-y divide-border">
+          <EntityListPanel className="border-0 bg-transparent">
             {members.map((member) => (
-              <li
+              <EntityListRow
                 key={member.id}
-                className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between"
+                className="flex-col items-stretch gap-3 sm:flex-row sm:items-center"
               >
                 <div className="min-w-0 flex-1 space-y-1">
                   <Input
@@ -225,7 +229,7 @@ export function TeamManagement({
                     disabled={savingId === member.id}
                     aria-label={`Display name for ${member.email}`}
                   />
-                  <p className="truncate text-sm text-muted-foreground">
+                  <p className="truncate text-xs text-muted-foreground">
                     {member.email}
                   </p>
                 </div>
@@ -253,9 +257,9 @@ export function TeamManagement({
                     Remove
                   </Button>
                 </div>
-              </li>
+              </EntityListRow>
             ))}
-          </ul>
+          </EntityListPanel>
         </CardContent>
       </Card>
 

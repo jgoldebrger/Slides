@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
 import { clearDeckBackground } from "@/lib/actions/player";
@@ -9,6 +10,14 @@ import {
   uploadBackgroundImageClient,
 } from "@/lib/player/upload-background-client";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -75,71 +84,89 @@ export function PlayerBackgroundSettings({
   }
 
   return (
-    <div className="flex flex-wrap gap-4 rounded-lg border border-border bg-muted/40 p-4">
-      <form onSubmit={handleAudio} className="space-y-2">
-        <Label htmlFor="bg-audio" className="text-xs">
-          Background music
-        </Label>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            id="bg-audio"
-            name="file"
-            type="file"
-            accept="audio/mpeg,audio/mp3,audio/wav"
-            className="max-w-[200px] text-xs"
-            disabled={uploadingAudio}
-          />
-          <Button type="submit" size="sm" variant="outline" disabled={uploadingAudio}>
-            {uploadingAudio ? "…" : "Upload"}
-          </Button>
-          {backgroundAudioUrl && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={async () => {
-                const r = await clearDeckBackground(deckId, "audio");
-                if (getActionError(r)) toast.error(getActionError(r)!);
-                else toast.success("Audio removed");
-              }}
-            >
-              Remove
-            </Button>
-          )}
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" size="sm" className="gap-2">
+          <Settings2 className="h-4 w-4" aria-hidden />
+          Background
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Player background</DialogTitle>
+          <DialogDescription>
+            Optional music and backdrop for this presentation.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-6">
+          <form onSubmit={handleAudio} className="space-y-2">
+            <Label htmlFor="bg-audio">Background music</Label>
+            <Input
+              id="bg-audio"
+              name="file"
+              type="file"
+              accept="audio/mpeg,audio/mp3,audio/wav"
+              disabled={uploadingAudio}
+            />
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                size="sm"
+                disabled={uploadingAudio}
+              >
+                {uploadingAudio ? "Uploading…" : "Upload audio"}
+              </Button>
+              {backgroundAudioUrl ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    const r = await clearDeckBackground(deckId, "audio");
+                    if (getActionError(r)) toast.error(getActionError(r)!);
+                    else toast.success("Audio removed");
+                  }}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+          </form>
+          <form onSubmit={handleImage} className="space-y-2">
+            <Label htmlFor="bg-image">Background image</Label>
+            <Input
+              id="bg-image"
+              name="file"
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              disabled={uploadingImage}
+            />
+            <div className="flex gap-2">
+              <Button
+                type="submit"
+                size="sm"
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? "Uploading…" : "Upload image"}
+              </Button>
+              {backgroundImageUrl ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    const r = await clearDeckBackground(deckId, "image");
+                    if (getActionError(r)) toast.error(getActionError(r)!);
+                    else toast.success("Image removed");
+                  }}
+                >
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+          </form>
         </div>
-      </form>
-      <form onSubmit={handleImage} className="space-y-2">
-        <Label htmlFor="bg-image" className="text-xs">
-          Background image
-        </Label>
-        <div className="flex flex-wrap items-center gap-2">
-          <Input
-            id="bg-image"
-            name="file"
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="max-w-[200px] text-xs"
-            disabled={uploadingImage}
-          />
-          <Button type="submit" size="sm" variant="outline" disabled={uploadingImage}>
-            {uploadingImage ? "…" : "Upload"}
-          </Button>
-          {backgroundImageUrl && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={async () => {
-                const r = await clearDeckBackground(deckId, "image");
-                if (getActionError(r)) toast.error(getActionError(r)!);
-                else toast.success("Image removed");
-              }}
-            >
-              Remove
-            </Button>
-          )}
-        </div>
-      </form>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

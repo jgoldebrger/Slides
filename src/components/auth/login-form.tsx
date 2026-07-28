@@ -3,18 +3,12 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
+import { AuthFormHeader } from "@/components/auth/auth-form-header";
 import { signInAction } from "@/lib/actions/auth";
 import { safeRedirectPath } from "@/lib/safe-redirect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export function LoginForm() {
   const router = useRouter();
@@ -40,68 +34,70 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle as="h1">Sign in to UpdateDeck</CardTitle>
-        <CardDescription>
-          Turn project updates into polished slide decks.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? "login-error" : undefined}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? "login-error" : undefined}
-            />
-          </div>
-          {error && (
-            <p id="login-error" role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
+    <div className="space-y-8">
+      <AuthFormHeader
+        title="Sign in"
+        description="Turn project updates into polished slide decks."
+      />
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="email"
+            className="h-10"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "login-error" : undefined}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+            className="h-10"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "login-error" : undefined}
+          />
+        </div>
+        {error && (
+          <p id="login-error" role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <Button type="submit" size="lg" className="w-full" disabled={loading}>
+          {loading ? "Signing in…" : "Sign in"}
+        </Button>
+      </form>
+
+      <div className="space-y-3 text-center text-sm text-muted-foreground">
+        <p>
           <Link
             href="/forgot-password"
-            className="font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            className="font-medium text-link underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
             Forgot password?
           </Link>
         </p>
-        <p className="mt-2 text-center text-sm text-muted-foreground">
+        <p>
           No account?{" "}
           <Link
             href="/signup"
-            className="font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+            className="font-medium text-link underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
             Sign up
           </Link>
         </p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

@@ -13,6 +13,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import {
+  EntityListMeta,
+  EntityListPanel,
+  EntityListPrimary,
+  EntityListRow,
+  EntityListTrailing,
+  entityListMenuButtonClass,
+} from "@/components/shared/entity-list";
 
 type PromptRow = {
   id: string;
@@ -23,7 +31,11 @@ type PromptRow = {
   tags: string[];
 };
 
-export function PromptLibraryPanel() {
+export function PromptLibraryPanel({
+  listClassName,
+}: {
+  listClassName?: string;
+} = {}) {
   const [prompts, setPrompts] = useState<PromptRow[]>([]);
   const [name, setName] = useState("");
   const [body, setBody] = useState("");
@@ -99,31 +111,32 @@ export function PromptLibraryPanel() {
         Save prompt
       </Button>
 
-      <ul className="divide-y divide-border rounded-lg border border-border">
-        {prompts.map((p) => (
-          <li key={p.id} className="flex items-start justify-between gap-2 p-3">
-            <div className="min-w-0">
-              <p className="font-medium">{p.name}</p>
-              <p className="truncate text-xs text-muted-foreground">{p.body}</p>
-              <p className="text-xs text-muted-foreground">{p.scope}</p>
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => void handleFavorite(p.id, !p.is_favorite)}
-              aria-label={p.is_favorite ? "Unfavorite" : "Favorite"}
-            >
-              <Star
-                className={`h-4 w-4 ${p.is_favorite ? "fill-current text-warning" : ""}`}
-              />
-            </Button>
-          </li>
-        ))}
-        {!prompts.length && (
-          <li className="p-4 text-sm text-muted-foreground">No prompts yet.</li>
-        )}
-      </ul>
+      {prompts.length ? (
+        <EntityListPanel className={listClassName}>
+          {prompts.map((p) => (
+            <EntityListRow key={p.id}>
+              <EntityListPrimary title={p.name} subtitle={p.body} />
+              <EntityListTrailing>
+                <EntityListMeta className="inline capitalize">{p.scope}</EntityListMeta>
+                <Button
+                  type="button"
+                  size="icon"
+                  variant="ghost"
+                  className={entityListMenuButtonClass}
+                  onClick={() => void handleFavorite(p.id, !p.is_favorite)}
+                  aria-label={p.is_favorite ? "Unfavorite" : "Favorite"}
+                >
+                  <Star
+                    className={`h-4 w-4 ${p.is_favorite ? "fill-current text-warning" : ""}`}
+                  />
+                </Button>
+              </EntityListTrailing>
+            </EntityListRow>
+          ))}
+        </EntityListPanel>
+      ) : (
+        <p className="text-sm text-muted-foreground">No prompts yet.</p>
+      )}
     </div>
   );
 }

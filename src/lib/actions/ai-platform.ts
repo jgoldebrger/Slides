@@ -73,7 +73,7 @@ export async function setOrgAiFeatureEnabled(featureId: string, enabled: boolean
     const prefs = await loadOrgAiPrefs(supabase, orgId);
     const featureOverrides = { ...(prefs.featureOverrides ?? {}), [featureId]: enabled };
     await saveOrgAiPrefs(supabase, orgId, { ...prefs, featureOverrides });
-    revalidatePath("/settings");
+    revalidatePath("/settings", "layout");
     return { success: true as const, featureId, enabled };
   } catch (err) {
     return actionError(toPublicError(err, "Failed to update feature"));
@@ -84,7 +84,7 @@ export async function updateOrgAiPrefs(prefs: OrgAiPrefs) {
   const { supabase, orgId } = await requireOrgAdmin();
   try {
     await saveOrgAiPrefs(supabase, orgId, prefs);
-    revalidatePath("/settings");
+    revalidatePath("/settings", "layout");
     return { success: true as const };
   } catch (err) {
     return actionError(toPublicError(err, "Failed to save AI preferences"));
@@ -114,7 +114,7 @@ export async function updateOrgAiPrefsFromNaturalLanguage(instruction: string) {
     const existing = await loadOrgAiPrefs(supabase, orgId);
     const merged = await parseNaturalLanguageAiPrefs(trimmed, existing);
     await saveOrgAiPrefs(supabase, orgId, merged);
-    revalidatePath("/settings");
+    revalidatePath("/settings", "layout");
     return { success: true as const, prefs: merged };
   } catch (err) {
     if (err instanceof Error && err.message.includes("permission")) {

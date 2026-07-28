@@ -2,7 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { ProjectListRow } from "@/components/projects/project-list-row";
-import { Input } from "@/components/ui/input";
+import {
+  EntityListEmpty,
+  EntityListPanel,
+  EntityListSearchToolbar,
+} from "@/components/shared/entity-list";
 import {
   SEARCH_DEBOUNCE_MS,
   useDebouncedValue,
@@ -35,25 +39,26 @@ export function ProjectList({ projects }: ProjectListProps) {
     );
   }, [projects, debouncedQuery]);
 
+  const countLabel = `${filtered.length} project${filtered.length === 1 ? "" : "s"}`;
+
   return (
-    <div className="space-y-3">
-      <Input
-        type="search"
+    <div className="space-y-4">
+      <EntityListSearchToolbar
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={setQuery}
         placeholder="Search projects…"
-        aria-label="Search projects"
+        ariaLabel="Search projects"
+        countLabel={countLabel}
       />
+
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-sm text-muted-foreground">
-          No projects match your search.
-        </p>
+        <EntityListEmpty message="No projects match your search." />
       ) : (
-        <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+        <EntityListPanel>
           {filtered.map((project) => (
             <ProjectListRow key={project.id} project={project} />
           ))}
-        </ul>
+        </EntityListPanel>
       )}
     </div>
   );

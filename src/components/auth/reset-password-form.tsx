@@ -3,17 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { AuthFormHeader } from "@/components/auth/auth-form-header";
 import { updatePasswordAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 
 export function ResetPasswordForm() {
   const router = useRouter();
@@ -41,57 +35,60 @@ export function ResetPasswordForm() {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle as="h1">Choose a new password</CardTitle>
-        <CardDescription>
-          At least 12 characters, including a letter and a number.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="password">New password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={12}
-              autoComplete="new-password"
-              aria-invalid={error ? true : undefined}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm">Confirm password</Label>
-            <Input
-              id="confirm"
-              type="password"
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              required
-              minLength={12}
-              autoComplete="new-password"
-              aria-invalid={error ? true : undefined}
-              aria-describedby={error ? "reset-error" : undefined}
-            />
-          </div>
-          {error && (
-            <p id="reset-error" role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Updating…" : "Update password"}
-          </Button>
-        </form>
-        <p className="mt-4 text-center text-sm text-muted-foreground">
-          <Link href="/login" className="text-foreground underline">
-            Back to sign in
-          </Link>
-        </p>
-      </CardContent>
-    </Card>
+    <div className="space-y-8">
+      <AuthFormHeader
+        title="Choose a new password"
+        description="At least 12 characters, including a letter and a number."
+      />
+
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="password">New password</Label>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={12}
+            autoComplete="new-password"
+            className="h-10"
+            aria-invalid={error ? true : undefined}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="confirm">Confirm password</Label>
+          <Input
+            id="confirm"
+            type="password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+            required
+            minLength={12}
+            autoComplete="new-password"
+            className="h-10"
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? "reset-error" : undefined}
+          />
+        </div>
+        {error && (
+          <p id="reset-error" role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <Button type="submit" size="lg" className="w-full" disabled={loading}>
+          {loading ? "Updating…" : "Update password"}
+        </Button>
+      </form>
+
+      <p className="text-center text-sm text-muted-foreground">
+        <Link
+          href="/login"
+          className="font-medium text-link underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+        >
+          Back to sign in
+        </Link>
+      </p>
+    </div>
   );
 }

@@ -21,7 +21,7 @@ export default async function ProjectsPage() {
     .order("updated_at", { ascending: false });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title="Projects"
         description="Manage project update workspaces."

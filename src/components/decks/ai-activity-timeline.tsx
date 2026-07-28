@@ -3,15 +3,25 @@
 import { useEffect, useState } from "react";
 import { getDeckAiActivity } from "@/lib/actions/ai-platform";
 import type { AiActivityEntry } from "@/lib/ai/activity";
+import {
+  EntityListMeta,
+  EntityListPanel,
+  EntityListPrimary,
+  EntityListRow,
+  EntityListTrailing,
+  formatListDate,
+} from "@/components/shared/entity-list";
 
 type AiActivityTimelineProps = {
   deckId?: string;
   entries?: AiActivityEntry[];
+  className?: string;
 };
 
 export function AiActivityTimeline({
   deckId,
   entries: initialEntries,
+  className,
 }: AiActivityTimelineProps) {
   const [entries, setEntries] = useState<AiActivityEntry[]>(
     initialEntries ?? []
@@ -46,19 +56,20 @@ export function AiActivityTimeline({
   }
 
   return (
-    <ul className="space-y-2 text-sm">
+    <EntityListPanel className={className}>
       {entries.map((entry) => (
-        <li
-          key={entry.id}
-          className="rounded-md border border-border px-3 py-2"
-        >
-          <div className="font-medium">{entry.summary ?? entry.action}</div>
-          <div className="text-xs text-muted-foreground">
-            {new Date(entry.created_at).toLocaleString()}
-            {entry.feature_id ? ` · ${entry.feature_id}` : ""}
-          </div>
-        </li>
+        <EntityListRow key={entry.id}>
+          <EntityListPrimary
+            title={entry.summary ?? entry.action}
+            subtitle={entry.feature_id ?? undefined}
+          />
+          <EntityListTrailing>
+            <EntityListMeta className="inline">
+              {formatListDate(entry.created_at)}
+            </EntityListMeta>
+          </EntityListTrailing>
+        </EntityListRow>
       ))}
-    </ul>
+    </EntityListPanel>
   );
 }

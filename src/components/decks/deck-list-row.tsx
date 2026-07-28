@@ -24,6 +24,14 @@ import {
 import { DeckStatusBadge } from "@/components/decks/deck-status-badge";
 import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
+import {
+  EntityListMeta,
+  EntityListPrimary,
+  EntityListRow,
+  EntityListTrailing,
+  entityListMenuButtonClass,
+  formatListDate,
+} from "@/components/shared/entity-list";
 
 type DeckListRowProps = {
   deck: {
@@ -32,6 +40,7 @@ type DeckListRowProps = {
     type: string;
     status: string;
     projectName?: string;
+    updated_at?: string;
   };
   isViewer: boolean;
 };
@@ -41,6 +50,7 @@ export function DeckListRow({ deck, isViewer }: DeckListRowProps) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const primaryHref = deckPrimaryHref(deck.id, deck.status, isViewer);
+  const subtitle = `${deck.projectName ?? "Unknown project"} · ${deckTypeLabel(deck.type)}`;
 
   async function handleDelete() {
     setDeleting(true);
@@ -58,24 +68,27 @@ export function DeckListRow({ deck, isViewer }: DeckListRowProps) {
 
   return (
     <>
-      <li className="flex items-center justify-between gap-2 px-4 py-3 hover:bg-muted/60">
-        <Link href={primaryHref} className="min-w-0 flex-1">
-          <p className="font-medium">{deck.name}</p>
-          <p className="text-sm text-muted-foreground">
-            {deck.projectName ?? "Unknown project"} ·{" "}
-            {deckTypeLabel(deck.type)}
-          </p>
-        </Link>
-        <div className="flex items-center gap-2">
+      <EntityListRow>
+        <EntityListPrimary
+          href={primaryHref}
+          title={deck.name}
+          subtitle={subtitle}
+        />
+        <EntityListTrailing>
           {!isViewer && <DeckStatusBadge status={deck.status} />}
-          {isViewer && (
-            <span className="hidden text-xs text-muted-foreground sm:inline">
-              Watch
-            </span>
-          )}
+          {isViewer ? (
+            <EntityListMeta>Watch</EntityListMeta>
+          ) : deck.updated_at ? (
+            <EntityListMeta>{formatListDate(deck.updated_at)}</EntityListMeta>
+          ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label={`Actions for ${deck.name}`}>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={entityListMenuButtonClass}
+                aria-label={`Actions for ${deck.name}`}
+              >
                 <MoreHorizontal className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -109,8 +122,8 @@ export function DeckListRow({ deck, isViewer }: DeckListRowProps) {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-        </div>
-      </li>
+        </EntityListTrailing>
+      </EntityListRow>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent>

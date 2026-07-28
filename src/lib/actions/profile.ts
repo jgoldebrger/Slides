@@ -57,7 +57,7 @@ export async function updateProfileSettings(payload: {
     });
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings", "layout");
   return { success: true };
 }
 

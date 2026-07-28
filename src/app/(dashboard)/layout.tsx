@@ -11,7 +11,6 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  let orgName = "Workspace";
   let orgId = "";
   let userEmail = "";
   let userId = "";
@@ -20,7 +19,6 @@ export default async function DashboardLayout({
 
   try {
     const ctx = await getOrgContext();
-    orgName = ctx.orgName;
     orgId = ctx.orgId;
     userEmail = ctx.user.email ?? "";
     userId = ctx.user.id;
@@ -41,9 +39,8 @@ export default async function DashboardLayout({
       >
         Skip to main content
       </a>
-      <div className="flex min-h-screen flex-col bg-background md:flex-row md:items-start">
+      <div className="flex min-h-screen flex-col bg-raised md:flex-row">
         <DashboardSidebar
-          orgName={orgName}
           userEmail={userEmail}
           isViewer={isViewer}
           canManageTeam={canManageTeam}
@@ -51,8 +48,11 @@ export default async function DashboardLayout({
           orgs={orgs}
           activeOrgId={orgId}
         />
-        <main id="main-content" className="flex-1 overflow-auto">
-          <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6">
+        <main
+          id="main-content"
+          className="flex-1 overflow-auto bg-[var(--color-brand-100)]/35 md:border-l md:border-link/15"
+        >
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
             {children}
           </div>
         </main>

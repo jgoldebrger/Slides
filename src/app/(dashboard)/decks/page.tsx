@@ -16,7 +16,7 @@ export default async function DecksPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHeader
         title={isViewer ? "Presentations" : "Decks"}
         description={
@@ -61,6 +61,7 @@ export default async function DecksPage() {
               type: deck.type,
               status: deck.status,
               projectName: project?.name,
+              updated_at: deck.updated_at,
             };
           })}
         />

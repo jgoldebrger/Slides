@@ -51,7 +51,7 @@ export default function LandingPage() {
       </a>
 
       <main id="main-content">
-        <div data-theme="dark" className="relative">
+        <div data-theme="dark" className="relative text-foreground">
           <header className="relative z-20 border-b border-border bg-background/80 backdrop-blur-md">
             <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
               <span className="text-xl font-semibold tracking-tight text-link">
