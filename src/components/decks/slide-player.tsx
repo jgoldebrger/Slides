@@ -27,6 +27,7 @@ import {
   loadNarrationPrefs,
   saveNarrationPrefs,
 } from "@/lib/slides/narration";
+import { parseSlideAnimation } from "@/lib/slides/animations";
 import type { Slide } from "@/types/slide";
 import { Button } from "@/components/ui/button";
 import { AiPresentPanel } from "@/components/decks/ai-present-panel";
@@ -76,6 +77,7 @@ export function SlidePlayer({
   const [prefsReady, setPrefsReady] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [bulletStep, setBulletStep] = useState<number | null>(null);
 
   const bgAudioRef = useRef<HTMLAudioElement | null>(null);
   const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -214,19 +216,47 @@ export function SlidePlayer({
       const clamped = Math.max(0, Math.min(sorted.length - 1, next));
       indexRef.current = clamped;
       setIndex(clamped);
+      const slide = sorted[clamped];
+      const anim = parseSlideAnimation(slide?.metadata);
+      const bulletCount = slide?.content.bullets?.length ?? 0;
+      if (!playingRef.current && anim.staggerBullets && bulletCount > 0) {
+        setBulletStep(1);
+      } else {
+        setBulletStep(null);
+      }
     },
-    [sorted.length, stopNarrationAudio]
+    [sorted, stopNarrationAudio]
   );
+
+  const advanceBulletOrSlide = useCallback(() => {
+    const slide = sorted[indexRef.current];
+    if (!slide) return false;
+    const anim = parseSlideAnimation(slide.metadata);
+    const bulletCount = slide.content.bullets?.length ?? 0;
+    const currentStep = bulletStep ?? 1;
+    if (
+      !playingRef.current &&
+      anim.staggerBullets &&
+      bulletCount > 0 &&
+      currentStep < bulletCount
+    ) {
+      setBulletStep(currentStep + 1);
+      return true;
+    }
+    setBulletStep(null);
+    return false;
+  }, [bulletStep, sorted]);
 
   const advanceOrStop = useCallback(() => {
     if (!playingRef.current) return;
+    if (advanceBulletOrSlide()) return;
     if (indexRef.current < sorted.length - 1) {
       goTo(indexRef.current + 1);
     } else {
       setPlaying(false);
       playingRef.current = false;
     }
-  }, [goTo, sorted.length]);
+  }, [advanceBulletOrSlide, goTo, sorted.length]);
 
   const playNarrationBlob = useCallback(
     async (blob: Blob, abort: AbortSignal) => {
@@ -324,6 +354,14 @@ export function SlidePlayer({
   const current = sorted[index];
 
   useEffect(() => {
+    if (playing) return;
+    const slide = sorted[index];
+    const anim = parseSlideAnimation(slide?.metadata);
+    const count = slide?.content.bullets?.length ?? 0;
+    setBulletStep(anim.staggerBullets && count > 0 ? 1 : null);
+  }, [index, playing, sorted]);
+
+  useEffect(() => {
     playingRef.current = playing;
     if (!playing) {
       stopNarrationAudio();
@@ -331,6 +369,7 @@ export function SlidePlayer({
       return;
     }
 
+    setBulletStep(null);
     bgAudioRef.current?.play().catch(() => undefined);
     const cleanup = playCurrentSlide();
     return () => {
@@ -372,6 +411,12 @@ export function SlidePlayer({
       document.removeEventListener("fullscreenchange", onFullscreenChange);
   }, []);
 
+  const handleManualNext = useCallback(() => {
+    setPlaying(false);
+    if (advanceBulletOrSlide()) return;
+    goTo(indexRef.current + 1);
+  }, [advanceBulletOrSlide, goTo]);
+
   const toggleFullscreen = useCallback(async () => {
     const el = presentationRef.current;
     if (!el) return;
@@ -411,14 +456,12 @@ export function SlidePlayer({
           break;
         case "ArrowRight":
         case "PageDown":
+          e.preventDefault();
+          handleManualNext();
+          break;
         case " ":
           e.preventDefault();
-          if (e.key === " ") {
-            togglePlay();
-          } else {
-            setPlaying(false);
-            goTo(indexRef.current + 1);
-          }
+          togglePlay();
           break;
         case "Home":
           e.preventDefault();
@@ -447,7 +490,7 @@ export function SlidePlayer({
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [goTo, sorted.length, toggleFullscreen, togglePlay]);
+  }, [goTo, handleManualNext, sorted.length, toggleFullscreen, togglePlay]);
 
   const progressPercent =
     sorted.length > 1 ? (index / (sorted.length - 1)) * 100 : 0;
@@ -456,6 +499,14 @@ export function SlidePlayer({
     "text-background/90 hover:bg-background/10 hover:text-background",
     isFullscreen && "text-background/90 hover:bg-background/10"
   );
+
+  const currentAnimation = parseSlideAnimation(current?.metadata);
+  const currentBulletCount = current?.content.bullets?.length ?? 0;
+  const canRevealMoreBullets =
+    currentAnimation.staggerBullets &&
+    currentBulletCount > 0 &&
+    (bulletStep ?? 1) < currentBulletCount;
+  const nextDisabled = index >= sorted.length - 1 && !canRevealMoreBullets;
 
   return (
     <div className="mx-auto max-w-5xl space-y-5">
@@ -535,10 +586,13 @@ export function SlidePlayer({
             <div className="relative flex h-full items-center justify-center p-4 sm:p-8">
               {current ? (
                 <SlidePreview
-                  key={current.id}
+                  key={`${current.id}-${index}-${bulletStep ?? "all"}`}
                   slide={current}
                   applyBranding={applyBranding}
                   brandTheme={brandTheme}
+                  playAnimations
+                  animationRunId={`${index}-${bulletStep ?? "all"}`}
+                  visibleBulletCount={bulletStep ?? undefined}
                   className={cn(
                     "mx-auto w-full max-w-4xl shadow-2xl",
                     isFullscreen && "max-h-full"
@@ -613,11 +667,8 @@ export function SlidePlayer({
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => {
-                    setPlaying(false);
-                    goTo(index + 1);
-                  }}
-                  disabled={index >= sorted.length - 1}
+                  onClick={handleManualNext}
+                  disabled={nextDisabled}
                   aria-label="Next slide"
                   className={controlButtonClass}
                 >

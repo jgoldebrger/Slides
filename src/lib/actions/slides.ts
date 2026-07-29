@@ -22,6 +22,7 @@ export async function updateSlide(
       type: parsed.data.type,
       content: parsed.data.content,
       speaker_notes: parsed.data.speaker_notes,
+      metadata: parsed.data.metadata ?? {},
       updated_at: new Date().toISOString(),
     })
     .eq("id", slideId)

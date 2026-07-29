@@ -7,7 +7,7 @@ import {
 } from "@/lib/slides/layout-theme";
 import { PPTX_LAYOUT_MAPPERS } from "@/lib/export/layouts/registry";
 import type { Slide, SlideLayout } from "@/types/slide";
-import type PptxGenJS from "pptxgenjs";
+import { richTextToPlainText } from "@/lib/slides/rich-text";
 
 export type { BrandTheme };
 
@@ -52,7 +52,7 @@ function addTitleSlideBranding(
   }
 
   const font = PPTX_FONT_MAP[theme.fontStyle];
-  pptxSlide.addText(slide.title, {
+  pptxSlide.addText(richTextToPlainText(slide.title), {
     x: 0.5,
     y: titleY,
     w: 9,
@@ -65,7 +65,7 @@ function addTitleSlideBranding(
   });
 
   if (slide.content.body) {
-    pptxSlide.addText(slide.content.body, {
+    pptxSlide.addText(richTextToPlainText(slide.content.body), {
       x: 1,
       y: titleY + 1.1,
       w: 8,
@@ -98,7 +98,7 @@ function addSlideContent(
     addBrandedAccentBar(pptxSlide, colors);
   }
 
-  pptxSlide.addText(slide.title, {
+  pptxSlide.addText(richTextToPlainText(slide.title), {
     x: 0.5,
     y: branded ? 0.55 : 0.4,
     w: 9,

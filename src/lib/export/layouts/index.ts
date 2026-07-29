@@ -1,10 +1,11 @@
 import { stripHex } from "./types";
 import type { PptxLayoutMapper } from "./types";
 import { normalizeChartData } from "@/lib/slides/metrics-to-chart";
+import { richTextToPlainText } from "@/lib/slides/rich-text";
 
 export const mapTitleLayout: PptxLayoutMapper = ({ pptxSlide, slide, font, colors }) => {
   if (slide.content.body) {
-    pptxSlide.addText(slide.content.body, {
+    pptxSlide.addText(richTextToPlainText(slide.content.body), {
       x: 0.5,
       y: 1.5,
       w: 9,
@@ -34,7 +35,7 @@ export const mapBulletsLayout: PptxLayoutMapper = ({
 
   if (bullets.length) {
     pptxSlide.addText(
-      bullets.map((b) => ({ text: b, options: { bullet: true } })),
+      bullets.map((b) => ({ text: richTextToPlainText(b), options: { bullet: true } })),
       {
         x: 0.5,
         y: contentY,
@@ -206,7 +207,7 @@ export const mapTwoColumnLayout: PptxLayoutMapper = ({
     );
   }
   if (slide.content.body) {
-    pptxSlide.addText(slide.content.body, {
+    pptxSlide.addText(richTextToPlainText(slide.content.body), {
       x: 5.2,
       y: contentY + 2.2,
       w: 4.2,
@@ -229,7 +230,7 @@ export const mapImageCaptionLayout: PptxLayoutMapper = ({
 
   if (bullets.length) {
     pptxSlide.addText(
-      bullets.map((b) => ({ text: b, options: { bullet: true } })),
+      bullets.map((b) => ({ text: richTextToPlainText(b), options: { bullet: true } })),
       {
         x: 0.5,
         y: contentY,
@@ -299,7 +300,7 @@ export const mapChartLayout: PptxLayoutMapper = ({
   });
 
   if (slide.content.body) {
-    pptxSlide.addText(slide.content.body, {
+    pptxSlide.addText(richTextToPlainText(slide.content.body), {
       x: 0.5,
       y: contentY + 3.4,
       w: 9,
@@ -318,7 +319,7 @@ export const mapQuoteLayout: PptxLayoutMapper = ({
   colors,
 }) => {
   if (slide.content.quote) {
-    pptxSlide.addText(`"${slide.content.quote}"`, {
+    pptxSlide.addText(`"${richTextToPlainText(slide.content.quote)}"`, {
       x: 1,
       y: 2,
       w: 8,
@@ -358,7 +359,7 @@ export const mapSectionBreakLayout: PptxLayoutMapper = ({
     line: { color: stripHex(colors.primary), width: 0 },
   });
   if (slide.content.body) {
-    pptxSlide.addText(slide.content.body, {
+    pptxSlide.addText(richTextToPlainText(slide.content.body), {
       x: 0.85,
       y: contentY + 0.5,
       w: 8.5,

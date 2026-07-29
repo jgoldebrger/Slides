@@ -21,6 +21,16 @@ import {
 } from "@/lib/slides/remap-content";
 import { SlideVisualUpload } from "@/components/slides/slide-visual-upload";
 import { SlideBackgroundPanel } from "@/components/slides/slide-background-panel";
+import { BulletRichTextList } from "@/components/slides/bullet-rich-text-list";
+import { RichTextEditor } from "@/components/slides/rich-text-editor";
+import { SlideAnimationPanel } from "@/components/slides/slide-animation-panel";
+import { hasRichTextMarkup } from "@/lib/slides/rich-text";
+import {
+  buildSlideAnimationMetadata,
+  normalizeSlideAnimationSettings,
+  parseSlideAnimation,
+  type SlideAnimationSettings,
+} from "@/lib/slides/animations";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,29 +71,34 @@ type SlideEditorPanelProps = {
   onAnnotateImage?: () => void;
   /** Streamlined UI — title, content, quick AI chips, collapsible extras */
   simple?: boolean;
+  onPreviewAnimation?: () => void;
 };
 
 function buildContentFromFields({
   base,
   body,
-  bullets,
+  bulletItems,
   metricsText,
   quote,
   attribution,
 }: {
   base: SlideContent;
   body: string;
-  bullets: string;
+  bulletItems: string[];
   metricsText: string;
   quote: string;
   attribution: string;
 }): SlideContent {
   return {
     ...base,
-    body: body.trim() || undefined,
-    bullets: bullets.split("\n").map((l) => l.trim()).filter(Boolean),
+    body:
+      body.trim().length > 0 || hasRichTextMarkup(body) ? body : undefined,
+    bullets: bulletItems.filter(
+      (line) => line.trim().length > 0 || hasRichTextMarkup(line)
+    ),
     metrics: parseMetricsText(metricsText),
-    quote: quote.trim() || undefined,
+    quote:
+      quote.trim().length > 0 || hasRichTextMarkup(quote) ? quote : undefined,
     attribution: attribution.trim() || undefined,
   };
 }
@@ -96,12 +111,13 @@ export function SlideEditorPanel({
   onBackgroundAppliedToAll,
   onAnnotateImage,
   simple = false,
+  onPreviewAnimation,
 }: SlideEditorPanelProps) {
   const [title, setTitle] = useState(slide.title);
   const [layout, setLayout] = useState<SlideLayout>(slide.layout);
   const [body, setBody] = useState(slide.content.body ?? "");
-  const [bullets, setBullets] = useState(
-    (slide.content.bullets ?? []).join("\n")
+  const [bulletItems, setBulletItems] = useState<string[]>(
+    slide.content.bullets ?? []
   );
   const [metricsText, setMetricsText] = useState(
     formatMetricsText(slide.content.metrics)
@@ -111,6 +127,12 @@ export function SlideEditorPanel({
     slide.content.attribution ?? ""
   );
   const [speakerNotes, setSpeakerNotes] = useState(slide.speakerNotes ?? "");
+  const [animation, setAnimation] = useState<SlideAnimationSettings>(() =>
+    parseSlideAnimation(slide.metadata)
+  );
+  const handleAnimationChange = useCallback((next: SlideAnimationSettings) => {
+    setAnimation(normalizeSlideAnimationSettings(next));
+  }, []);
   const [rewriteInstructions, setRewriteInstructions] = useState("");
   const [saving, setSaving] = useState(false);
   const [rewriting, setRewriting] = useState(false);
@@ -127,6 +149,8 @@ export function SlideEditorPanel({
     slideRef.current = slide;
   }, [slide]);
 
+  const bulletItemsKey = JSON.stringify(bulletItems);
+
   useEffect(() => {
     onUpdateRef.current = onUpdate;
   }, [onUpdate]);
@@ -137,6 +161,8 @@ export function SlideEditorPanel({
 
   const slots = LAYOUT_CONTRACT[layout].slots;
 
+  const animationKey = JSON.stringify(animation);
+
   const persistSlide = useCallback(async () => {
     const currentSlide = slideRef.current;
     setSaving(true);
@@ -144,7 +170,7 @@ export function SlideEditorPanel({
     const content = buildContentFromFields({
       base: currentSlide.content,
       body,
-      bullets,
+      bulletItems,
       metricsText,
       quote,
       attribution,
@@ -156,6 +182,10 @@ export function SlideEditorPanel({
       type: currentSlide.type,
       content,
       speaker_notes: speakerNotes,
+      metadata: buildSlideAnimationMetadata(
+        currentSlide.metadata,
+        normalizeSlideAnimationSettings(animation)
+      ),
     };
 
     const result = await updateSlide(currentSlide.id, deckId, payload);
@@ -171,6 +201,10 @@ export function SlideEditorPanel({
         layout: layoutRef.current,
         content,
         speakerNotes,
+        metadata: buildSlideAnimationMetadata(
+          currentSlide.metadata,
+          normalizeSlideAnimationSettings(animation)
+        ),
       };
       slideRef.current = updated;
       onUpdateRef.current(updated);
@@ -180,26 +214,27 @@ export function SlideEditorPanel({
   }, [
     title,
     body,
-    bullets,
+    bulletItems,
     metricsText,
     quote,
     attribution,
     speakerNotes,
     deckId,
+    animationKey,
   ]);
 
   useDebouncedEffect(
     () => {
       void persistSlide();
     },
-    [title, layout, body, bullets, metricsText, quote, attribution, speakerNotes],
+    [title, layout, body, bulletItemsKey, metricsText, quote, attribution, speakerNotes, animationKey],
     AUTOSAVE_DEBOUNCE_MS,
     { skipFirst: true }
   );
 
   function applyContentToFields(content: SlideContent) {
     setBody(content.body ?? "");
-    setBullets((content.bullets ?? []).join("\n"));
+    setBulletItems(content.bullets ?? []);
     setMetricsText(formatMetricsText(content.metrics));
     setQuote(content.quote ?? "");
     setAttribution(content.attribution ?? "");
@@ -212,7 +247,7 @@ export function SlideEditorPanel({
     const currentContent = buildContentFromFields({
       base: slideRef.current.content,
       body,
-      bullets,
+      bulletItems,
       metricsText,
       quote,
       attribution,
@@ -460,39 +495,31 @@ export function SlideEditorPanel({
           ) : null}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="slide-title">Title</Label>
-          <Input
-            id="slide-title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </div>
+        <RichTextEditor
+          id="slide-title"
+          label="Title"
+          value={title}
+          onChange={setTitle}
+          singleLine
+          minHeight="2.75rem"
+        />
 
         {slots.includes("bullets") && (
-          <div className="space-y-2">
-            <Label htmlFor="slide-bullets">Content (one point per line)</Label>
-            <textarea
-              id="slide-bullets"
-              rows={5}
-              value={bullets}
-              onChange={(e) => setBullets(e.target.value)}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
+          <BulletRichTextList
+            id="slide-bullets"
+            label="Content"
+            items={bulletItems}
+            onChange={setBulletItems}
+          />
         )}
 
         {slots.includes("body") && !slots.includes("bullets") && (
-          <div className="space-y-2">
-            <Label htmlFor="slide-body">Content</Label>
-            <textarea
-              id="slide-body"
-              rows={4}
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            />
-          </div>
+          <RichTextEditor
+            id="slide-body"
+            label="Content"
+            value={body}
+            onChange={setBody}
+          />
         )}
 
         {slots.includes("metrics") && (
@@ -508,6 +535,13 @@ export function SlideEditorPanel({
             />
           </div>
         )}
+
+        <SlideAnimationPanel
+          value={animation}
+          onChange={handleAnimationChange}
+          onPreview={onPreviewAnimation}
+          hasBullets={slots.includes("bullets")}
+        />
 
         <div className="flex flex-wrap gap-2">
           {REWRITE_PRESETS.map((preset) => (
@@ -611,14 +645,14 @@ export function SlideEditorPanel({
         </TabsList>
 
         <TabsContent value="content" className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="slide-title">Title</Label>
-            <Input
-              id="slide-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </div>
+          <RichTextEditor
+            id="slide-title"
+            label="Title"
+            value={title}
+            onChange={setTitle}
+            singleLine
+            minHeight="2.75rem"
+          />
 
           <div className="space-y-2">
             <Label htmlFor="slide-layout">Layout</Label>
@@ -642,37 +676,29 @@ export function SlideEditorPanel({
           </div>
 
           {slots.includes("body") && (
-            <div className="space-y-2">
-              <Label htmlFor="slide-body">
-                {layout === "title" || layout === "section_break"
+            <RichTextEditor
+              id="slide-body"
+              label={
+                layout === "title" || layout === "section_break"
                   ? "Subtitle"
-                  : "Body"}
-              </Label>
-              <textarea
-                id="slide-body"
-                rows={3}
-                value={body}
-                onChange={(e) => setBody(e.target.value)}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </div>
+                  : "Body"
+              }
+              value={body}
+              onChange={setBody}
+            />
           )}
 
           {slots.includes("bullets") && (
-            <div className="space-y-2">
-              <Label htmlFor="slide-bullets">
-                {layout === "timeline"
-                  ? "Timeline items (one per line)"
-                  : "Bullets (one per line)"}
-              </Label>
-              <textarea
-                id="slide-bullets"
-                rows={4}
-                value={bullets}
-                onChange={(e) => setBullets(e.target.value)}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </div>
+            <BulletRichTextList
+              id="slide-bullets"
+              label={
+                layout === "timeline"
+                  ? "Timeline items"
+                  : "Bullets"
+              }
+              items={bulletItems}
+              onChange={setBulletItems}
+            />
           )}
 
           {slots.includes("metrics") && (
@@ -690,16 +716,12 @@ export function SlideEditorPanel({
           )}
 
           {slots.includes("quote") && (
-            <div className="space-y-2">
-              <Label htmlFor="slide-quote">Quote</Label>
-              <textarea
-                id="slide-quote"
-                rows={3}
-                value={quote}
-                onChange={(e) => setQuote(e.target.value)}
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            </div>
+            <RichTextEditor
+              id="slide-quote"
+              label="Quote"
+              value={quote}
+              onChange={setQuote}
+            />
           )}
 
           {slots.includes("attribution") && (
@@ -755,6 +777,13 @@ export function SlideEditorPanel({
               {generatingAltText ? "Generating…" : "Generate alt text"}
             </Button>
           )}
+
+          <SlideAnimationPanel
+            value={animation}
+            onChange={handleAnimationChange}
+            onPreview={onPreviewAnimation}
+            hasBullets={slots.includes("bullets")}
+          />
 
           <div className="space-y-2">
             <Label htmlFor="rewrite-instructions">Rewrite instructions (optional)</Label>

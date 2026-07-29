@@ -47,6 +47,15 @@ type SlideEditorProps = {
   initialShareBlurb?: string | null;
 };
 
+function dedupeSlidesById(slides: Slide[]): Slide[] {
+  const seen = new Set<string>();
+  return slides.filter((slide) => {
+    if (seen.has(slide.id)) return false;
+    seen.add(slide.id);
+    return true;
+  });
+}
+
 export function SlideEditor({
   deckId,
   initialSlides,
@@ -69,6 +78,7 @@ export function SlideEditor({
   const [annotatorOpen, setAnnotatorOpen] = useState(false);
   const [refreshDiff, setRefreshDiff] = useState<RefreshDiff | null>(null);
   const [pendingRefreshDiff, setPendingRefreshDiff] = useState(false);
+  const [animationPreviewTick, setAnimationPreviewTick] = useState(0);
   const prevStatusRef = useRef(deckStatus);
 
   const selectedSlide = slides.find((s) => s.id === selectedId) ?? null;
@@ -108,7 +118,7 @@ export function SlideEditor({
   }, [deckId, deckStatus, pendingRefreshDiff]);
 
   useEffect(() => {
-    setSlides(initialSlides);
+    setSlides(dedupeSlidesById(initialSlides));
   }, [initialSlides]);
 
   const handleRefreshFromUpdates = useCallback(async () => {
@@ -152,19 +162,10 @@ export function SlideEditor({
       return;
     }
     toast.success("Slide added");
-    router.refresh();
     if ("data" in result && result.data?.id) {
-      const newSlide: Slide = {
-        id: result.data.id,
-        order: slides.length,
-        type: "content",
-        layout: "bullets",
-        title: "New slide",
-        content: { bullets: ["Add content here"] },
-      };
-      setSlides((prev) => [...prev, newSlide]);
       setSelectedId(result.data.id);
     }
+    router.refresh();
   }
 
   async function handleDeleteSlide() {
@@ -305,6 +306,7 @@ export function SlideEditor({
           {selectedSlide ? (
             <>
               <SlidePreview
+                key={`${selectedSlide.id}-${animationPreviewTick}`}
                 slide={selectedSlide}
                 applyBranding={applyBranding}
                 brandTheme={brandTheme}
@@ -312,6 +314,8 @@ export function SlideEditor({
                 onImageClick={
                   annotatorImageSrc ? () => setAnnotatorOpen(true) : undefined
                 }
+                playAnimations
+                animationRunId={animationPreviewTick}
               />
               {annotatorImageSrc && (
                 <ImageAnnotatorModal
@@ -334,6 +338,9 @@ export function SlideEditor({
                   annotatorImageSrc ? () => setAnnotatorOpen(true) : undefined
                 }
                 simple
+                onPreviewAnimation={() =>
+                  setAnimationPreviewTick((tick) => tick + 1)
+                }
               />
             </>
           ) : (

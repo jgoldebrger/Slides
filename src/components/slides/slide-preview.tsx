@@ -7,6 +7,12 @@ import { assertLayoutContractsComplete } from "@/lib/slides/layout-contract";
 import type { Slide, SlideLayout } from "@/types/slide";
 import { cn } from "@/lib/utils";
 import { SlideChartPreview } from "@/components/slides/slide-chart-preview";
+import { RichTextContent } from "@/components/slides/rich-text-content";
+import {
+  parseSlideAnimation,
+  slideAnimationClass,
+  type SlideEntranceAnimation,
+} from "@/lib/slides/animations";
 
 assertLayoutContractsComplete();
 
@@ -17,6 +23,12 @@ type SlidePreviewProps = {
   brandTheme?: BrandPreviewTheme | null;
   deckBackgroundUrl?: string | null;
   onImageClick?: () => void;
+  /** Replay entrance animation (change between renders). */
+  animationRunId?: string | number;
+  /** When set, only show this many bullets (player step-through). */
+  visibleBulletCount?: number;
+  /** Apply entrance animation from slide metadata. */
+  playAnimations?: boolean;
 };
 
 type SlideColors = {
@@ -75,21 +87,70 @@ function PreviewBulletList({
   items,
   className,
   mutedStyle,
+  visibleBulletCount,
+  staggerAnimation,
 }: {
   items: string[];
   className?: string;
   mutedStyle: React.CSSProperties;
+  visibleBulletCount?: number;
+  staggerAnimation?: boolean;
 }) {
-  if (!items.length) return null;
+  const visible =
+    visibleBulletCount != null ? items.slice(0, visibleBulletCount) : items;
+  if (!visible.length) return null;
   return (
     <ul
-      className={cn("list-disc space-y-2 pl-5 text-sm", className)}
+      className={cn(
+        "list-disc space-y-2 pl-5 text-sm",
+        staggerAnimation && visibleBulletCount == null && "slide-bullet-stagger",
+        className
+      )}
       style={mutedStyle}
     >
-      {items.map((bullet, i) => (
-        <li key={i}>{bullet}</li>
+      {visible.map((bullet, i) => (
+        <li key={i}>
+          <RichTextContent html={bullet} />
+        </li>
       ))}
     </ul>
+  );
+}
+
+const CONTENT_ANIM_DELAY = {
+  title: 0,
+  body: 100,
+  bullets: 180,
+  image: 260,
+  metricBase: 200,
+} as const;
+
+function AnimatedBlock({
+  children,
+  play,
+  entrance,
+  animateContent,
+  delayMs = 0,
+  className,
+}: {
+  children: React.ReactNode;
+  play: boolean;
+  entrance: SlideEntranceAnimation;
+  animateContent: boolean;
+  delayMs?: number;
+  className?: string;
+}) {
+  if (!play || entrance === "none" || !animateContent) {
+    if (className) return <div className={className}>{children}</div>;
+    return <>{children}</>;
+  }
+  return (
+    <div
+      className={cn(slideAnimationClass(entrance), className)}
+      style={{ animationDelay: `${delayMs}ms` }}
+    >
+      {children}
+    </div>
   );
 }
 
@@ -100,8 +161,19 @@ export function SlidePreview({
   brandTheme = null,
   deckBackgroundUrl = null,
   onImageClick,
+  animationRunId = 0,
+  visibleBulletCount,
+  playAnimations = false,
 }: SlidePreviewProps) {
   const { layout, title, content } = slide;
+  const animation = parseSlideAnimation(slide.metadata);
+  const animateWholeSlide =
+    playAnimations &&
+    animation.entrance !== "none" &&
+    !animation.animateContent;
+  const entranceClass = animateWholeSlide
+    ? slideAnimationClass(animation.entrance)
+    : undefined;
   const colors = resolveSlideColors(applyBranding, brandTheme);
   const fontClass = applyBranding && brandTheme
     ? getPreviewFontClass(brandTheme.fontStyle)
@@ -110,10 +182,13 @@ export function SlidePreview({
   const backgroundUrl =
     content.backgroundImageUrl ?? deckBackgroundUrl ?? undefined;
 
+  const useDefaultEnter = !playAnimations || animation.entrance === "none";
+
   return (
     <div
       className={cn(
-        "slide-enter relative aspect-video w-full overflow-hidden rounded-lg border shadow-sm",
+        "relative aspect-video w-full overflow-hidden rounded-lg border shadow-sm",
+        useDefaultEnter && "slide-enter",
         fontClass,
         className
       )}
@@ -142,6 +217,10 @@ export function SlidePreview({
           aria-hidden
         />
       )}
+      <div
+        key={`${slide.id}-${animationRunId}`}
+        className={cn("h-full", entranceClass)}
+      >
       <SlideLayoutContent
         layout={layout}
         title={title}
@@ -149,7 +228,15 @@ export function SlidePreview({
         colors={colors}
         logoUrl={applyBranding ? brandTheme?.logoUrl : null}
         onImageClick={onImageClick}
+        visibleBulletCount={visibleBulletCount}
+        staggerBullets={
+          playAnimations && animation.staggerBullets && visibleBulletCount == null
+        }
+        playAnimations={playAnimations}
+        entrance={animation.entrance}
+        animateContent={animation.animateContent}
       />
+      </div>
       </div>
     </div>
   );
@@ -162,6 +249,11 @@ function SlideLayoutContent({
   colors,
   logoUrl,
   onImageClick,
+  visibleBulletCount,
+  staggerBullets = false,
+  playAnimations = false,
+  entrance = "none",
+  animateContent = true,
 }: {
   layout: SlideLayout;
   title: string;
@@ -169,32 +261,102 @@ function SlideLayoutContent({
   colors: SlideColors;
   logoUrl?: string | null;
   onImageClick?: () => void;
+  visibleBulletCount?: number;
+  staggerBullets?: boolean;
+  playAnimations?: boolean;
+  entrance?: SlideEntranceAnimation;
+  animateContent?: boolean;
 }) {
   const titleStyle = { color: colors.primary };
   const accentStyle = { color: colors.accent };
   const mutedClass = "text-sm";
   const mutedStyle = { color: colors.muted };
 
+  const block = (
+    node: React.ReactNode,
+    delayMs: number,
+    className?: string
+  ) => (
+    <AnimatedBlock
+      play={playAnimations}
+      entrance={entrance}
+      animateContent={animateContent}
+      delayMs={delayMs}
+      className={className}
+    >
+      {node}
+    </AnimatedBlock>
+  );
+
+  const renderTitle = (className: string) =>
+    block(
+      <h2 className={className} style={titleStyle}>
+        <RichTextContent html={title} />
+      </h2>,
+      CONTENT_ANIM_DELAY.title
+    );
+
+  const renderBody = (className: string, html: string) =>
+    block(
+      <p className={className} style={mutedStyle}>
+        <RichTextContent html={html} />
+      </p>,
+      CONTENT_ANIM_DELAY.body
+    );
+
+  const renderBullets = (
+    items: string[],
+    options?: { className?: string; applyStep?: boolean }
+  ) =>
+    block(
+      <PreviewBulletList
+        items={items}
+        mutedStyle={mutedStyle}
+        className={options?.className}
+        visibleBulletCount={
+          options?.applyStep === false ? undefined : visibleBulletCount
+        }
+        staggerAnimation={staggerBullets}
+      />,
+      CONTENT_ANIM_DELAY.bullets
+    );
+
+  const renderImage = (imageUrl: string, options: {
+    imageAlt?: string;
+    maxHeight?: string;
+    className?: string;
+    wrapperClassName?: string;
+  }) =>
+    block(
+      <div className={options.wrapperClassName}>
+        <PreviewSlideImage
+          imageUrl={imageUrl}
+          imageAlt={options.imageAlt}
+          title={title}
+          maxHeight={options.maxHeight}
+          className={options.className}
+          onClick={onImageClick}
+        />
+      </div>,
+      CONTENT_ANIM_DELAY.image
+    );
+
   switch (layout) {
     case "title":
       return (
         <div className="flex h-full flex-col items-center justify-center text-center">
-          {logoUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={logoUrl}
-              alt=""
-              className="mb-6 max-h-16 max-w-[200px] object-contain"
-            />
-          )}
-          <h2 className="text-3xl font-bold tracking-tight" style={titleStyle}>
-            {title}
-          </h2>
-          {content.body && (
-            <p className="mt-4 text-lg" style={mutedStyle}>
-              {content.body}
-            </p>
-          )}
+          {logoUrl &&
+            block(
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt=""
+                className="mb-6 max-h-16 max-w-[200px] object-contain"
+              />,
+              0
+            )}
+          {renderTitle("text-3xl font-bold tracking-tight")}
+          {content.body ? renderBody("mt-4 text-lg", content.body) : null}
         </div>
       );
 
@@ -204,54 +366,43 @@ function SlideLayoutContent({
           className="flex h-full items-center border-l-4 pl-6"
           style={{ borderColor: colors.primary }}
         >
-          <h2 className="text-2xl font-semibold" style={titleStyle}>
-            {title}
-          </h2>
+          {renderTitle("text-2xl font-semibold")}
         </div>
       );
 
     case "bullets": {
-      const bullets = content.bullets ?? [];
+      const allBullets = content.bullets ?? [];
+      const bullets =
+        visibleBulletCount != null
+          ? allBullets.slice(0, visibleBulletCount)
+          : allBullets;
       if (content.imageUrl) {
         return (
           <div className="flex h-full flex-col">
-            <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
-              {title}
-            </h2>
+            {renderTitle("mb-4 text-xl font-semibold")}
             <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
               <div className="min-h-0 overflow-auto">
-                <PreviewBulletList items={bullets} mutedStyle={mutedStyle} />
-                {content.body && (
-                  <p className="mt-3 text-sm" style={mutedStyle}>
-                    {content.body}
-                  </p>
-                )}
+                {renderBullets(bullets)}
+                {content.body
+                  ? renderBody("mt-3 text-sm", content.body)
+                  : null}
               </div>
-              <div className="flex items-center justify-center rounded-lg bg-muted/30 p-2">
-                <PreviewSlideImage
-                  imageUrl={content.imageUrl}
-                  imageAlt={content.imageAlt}
-                  title={title}
-                  maxHeight="max-h-full"
-                  className="h-full"
-                  onClick={onImageClick}
-                />
-              </div>
+              {renderImage(content.imageUrl, {
+                imageAlt: content.imageAlt,
+                maxHeight: "max-h-full",
+                className: "h-full",
+                wrapperClassName:
+                  "flex items-center justify-center rounded-lg bg-muted/30 p-2",
+              })}
             </div>
           </div>
         );
       }
       return (
         <div className="flex h-full flex-col">
-          <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
-            {title}
-          </h2>
-          <PreviewBulletList items={bullets} mutedStyle={mutedStyle} />
-          {content.body && (
-            <p className="mt-3 text-sm" style={mutedStyle}>
-              {content.body}
-            </p>
-          )}
+          {renderTitle("mb-4 text-xl font-semibold")}
+          {renderBullets(bullets)}
+          {content.body ? renderBody("mt-3 text-sm", content.body) : null}
         </div>
       );
     }
@@ -262,67 +413,81 @@ function SlideLayoutContent({
         metrics.length === 0 ? (content.bullets ?? []) : [];
       return (
         <div className="flex h-full flex-col">
-          <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
-            {title}
-          </h2>
+          {renderTitle("mb-4 text-xl font-semibold")}
           {metrics.length > 0 ? (
             <div className="grid flex-1 grid-cols-2 gap-4">
-              {metrics.map((metric, i) => (
-                <div
-                  key={i}
-                  className="rounded-lg border p-4 text-center"
-                  style={{ borderColor: colors.border }}
-                >
-                  <p className="text-2xl font-bold" style={accentStyle}>
-                    {metric.value}
-                  </p>
-                  <p className="mt-1 text-xs" style={mutedStyle}>
-                    {metric.label}
-                  </p>
-                  {metric.trend && (
-                    <span className="mt-1 text-xs capitalize text-muted-foreground">
-                      {metric.trend}
-                    </span>
-                  )}
-                </div>
-              ))}
+              {metrics.map((metric, i) =>
+                block(
+                  <div
+                    key={i}
+                    className="rounded-lg border p-4 text-center"
+                    style={{ borderColor: colors.border }}
+                  >
+                    <p className="text-2xl font-bold" style={accentStyle}>
+                      {metric.value}
+                    </p>
+                    <p className="mt-1 text-xs" style={mutedStyle}>
+                      {metric.label}
+                    </p>
+                    {metric.trend ? (
+                      <span className="mt-1 text-xs capitalize text-muted-foreground">
+                        {metric.trend}
+                      </span>
+                    ) : null}
+                  </div>,
+                  CONTENT_ANIM_DELAY.metricBase + i * 80
+                )
+              )}
             </div>
           ) : (
-            <PreviewBulletList items={fallbackBullets} mutedStyle={mutedStyle} />
+            renderBullets(fallbackBullets)
           )}
-          {!metrics.length && !fallbackBullets.length && content.body && (
-            <p className="text-sm" style={mutedStyle}>
-              {content.body}
-            </p>
+          {!metrics.length && !fallbackBullets.length && content.body
+            ? renderBody("text-sm", content.body)
+            : null}
+        </div>
+      );
+    }
+
+    case "timeline": {
+      const timelineItems =
+        visibleBulletCount != null
+          ? (content.bullets ?? []).slice(0, visibleBulletCount)
+          : (content.bullets ?? []);
+      return (
+        <div className="flex h-full flex-col">
+          {renderTitle("mb-4 text-xl font-semibold")}
+          {block(
+            <div
+              className={cn(
+                "space-y-3",
+                staggerBullets && "slide-bullet-stagger"
+              )}
+            >
+              {timelineItems.map((item, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <span
+                    className="mt-1 h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: colors.primary }}
+                  />
+                  <p className={mutedClass} style={mutedStyle}>
+                    <RichTextContent html={item} />
+                  </p>
+                </div>
+              ))}
+            </div>,
+            CONTENT_ANIM_DELAY.bullets
           )}
         </div>
       );
     }
 
-    case "timeline":
-      return (
-        <div className="flex h-full flex-col">
-          <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
-            {title}
-          </h2>
-          <div className="space-y-3">
-            {(content.bullets ?? []).map((item, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <span
-                  className="mt-1 h-2 w-2 shrink-0 rounded-full"
-                  style={{ backgroundColor: colors.primary }}
-                />
-                <p className={mutedClass} style={mutedStyle}>
-                  {item}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-
     case "two_column": {
-      const bullets = content.bullets ?? [];
+      const allBullets = content.bullets ?? [];
+      const bullets =
+        visibleBulletCount != null
+          ? allBullets.slice(0, visibleBulletCount)
+          : allBullets;
       const mid = Math.ceil(bullets.length / 2);
       const left = bullets.slice(0, mid);
       const right = bullets.slice(mid);
@@ -330,34 +495,24 @@ function SlideLayoutContent({
       if (content.imageUrl) {
         return (
           <div className="flex h-full flex-col">
-            <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
-              {title}
-            </h2>
+            {renderTitle("mb-4 text-xl font-semibold")}
             <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
               <div className="min-h-0 overflow-auto">
-                <PreviewBulletList
-                  items={left.length ? left : bullets}
-                  mutedStyle={mutedStyle}
-                />
-                {content.body && (
-                  <p className="mt-3 text-sm" style={mutedStyle}>
-                    {content.body}
-                  </p>
-                )}
+                {renderBullets(left.length ? left : bullets)}
+                {content.body
+                  ? renderBody("mt-3 text-sm", content.body)
+                  : null}
               </div>
               <div className="flex flex-col gap-3">
-                <div className="flex flex-1 items-center justify-center rounded-lg bg-muted/30 p-2">
-                  <PreviewSlideImage
-                    imageUrl={content.imageUrl}
-                    imageAlt={content.imageAlt}
-                    title={title}
-                    maxHeight="max-h-full"
-                    onClick={onImageClick}
-                  />
-                </div>
-                {right.length > 0 && (
-                  <PreviewBulletList items={right} mutedStyle={mutedStyle} />
-                )}
+                {renderImage(content.imageUrl, {
+                  imageAlt: content.imageAlt,
+                  maxHeight: "max-h-full",
+                  wrapperClassName:
+                    "flex flex-1 items-center justify-center rounded-lg bg-muted/30 p-2",
+                })}
+                {right.length > 0
+                  ? renderBullets(right, { applyStep: false })
+                  : null}
               </div>
             </div>
           </div>
@@ -366,18 +521,12 @@ function SlideLayoutContent({
 
       return (
         <div className="flex h-full flex-col">
-          <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
-            {title}
-          </h2>
+          {renderTitle("mb-4 text-xl font-semibold")}
           <div className="grid flex-1 grid-cols-2 gap-6">
-            <PreviewBulletList items={left} mutedStyle={mutedStyle} />
-            <PreviewBulletList items={right} mutedStyle={mutedStyle} />
+            {renderBullets(left, { applyStep: false })}
+            {renderBullets(right, { applyStep: false })}
           </div>
-          {content.body && (
-            <p className="mt-3 text-sm" style={mutedStyle}>
-              {content.body}
-            </p>
-          )}
+          {content.body ? renderBody("mt-3 text-sm", content.body) : null}
         </div>
       );
     }
@@ -385,37 +534,28 @@ function SlideLayoutContent({
     case "image_caption":
       return (
         <div className="flex h-full flex-col">
-          <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
-            {title}
-          </h2>
+          {renderTitle("mb-4 text-xl font-semibold")}
           <div className="grid min-h-0 flex-1 grid-cols-2 gap-4">
             <div className="min-h-0 overflow-auto">
-              <PreviewBulletList
-                items={content.bullets ?? []}
-                mutedStyle={mutedStyle}
-              />
-              {content.body && (
-                <p className="text-sm" style={mutedStyle}>
-                  {content.body}
-                </p>
-              )}
+              {renderBullets(content.bullets ?? [])}
+              {content.body ? renderBody("text-sm", content.body) : null}
             </div>
-            <div
-              className="flex items-center justify-center rounded-lg p-2"
-              style={{ backgroundColor: `${colors.border}80` }}
-            >
-              {content.imageUrl ? (
-                <PreviewSlideImage
-                  imageUrl={content.imageUrl}
-                  imageAlt={content.imageAlt}
-                  title={title}
-                  maxHeight="max-h-full"
-                  onClick={onImageClick}
-                />
-              ) : (
-                <span className="text-sm opacity-50">Image placeholder</span>
-              )}
-            </div>
+            {content.imageUrl
+              ? renderImage(content.imageUrl, {
+                  imageAlt: content.imageAlt,
+                  maxHeight: "max-h-full",
+                  wrapperClassName:
+                    "flex items-center justify-center rounded-lg p-2",
+                })
+              : block(
+                  <div
+                    className="flex items-center justify-center rounded-lg p-2"
+                    style={{ backgroundColor: `${colors.border}80` }}
+                  >
+                    <span className="text-sm opacity-50">Image placeholder</span>
+                  </div>,
+                  CONTENT_ANIM_DELAY.image
+                )}
           </div>
         </div>
       );
@@ -427,27 +567,19 @@ function SlideLayoutContent({
         Array.isArray(content.metrics) && content.metrics.length > 0;
       return (
         <div className="flex h-full flex-col">
-          <h2 className="mb-4 text-xl font-semibold" style={titleStyle}>
-            {title}
-          </h2>
-          {hasChart || hasMetrics ? (
-            <SlideChartPreview
-              chartData={content.chartData}
-              metrics={content.metrics}
-              primaryColor={colors.primary}
-              mutedColor={colors.muted}
-            />
-          ) : (
-            <PreviewBulletList
-              items={content.bullets ?? []}
-              mutedStyle={mutedStyle}
-            />
-          )}
-          {content.body && (
-            <p className="mt-2 text-xs" style={mutedStyle}>
-              {content.body}
-            </p>
-          )}
+          {renderTitle("mb-4 text-xl font-semibold")}
+          {hasChart || hasMetrics
+            ? block(
+                <SlideChartPreview
+                  chartData={content.chartData}
+                  metrics={content.metrics}
+                  primaryColor={colors.primary}
+                  mutedColor={colors.muted}
+                />,
+                CONTENT_ANIM_DELAY.bullets
+              )
+            : renderBullets(content.bullets ?? [])}
+          {content.body ? renderBody("mt-2 text-xs", content.body) : null}
         </div>
       );
     }
@@ -455,28 +587,35 @@ function SlideLayoutContent({
     case "quote":
       return (
         <div className="flex h-full flex-col items-center justify-center text-center">
-          <blockquote className="text-xl font-medium italic" style={mutedStyle}>
-            &ldquo;{content.quote ?? content.body ?? title}&rdquo;
-          </blockquote>
-          {content.attribution && (
-            <p className="mt-4 text-sm" style={mutedStyle}>
-              — {content.attribution}
-            </p>
+          {block(
+            <blockquote
+              className="text-xl font-medium italic"
+              style={mutedStyle}
+            >
+              &ldquo;
+              <RichTextContent
+                html={content.quote ?? content.body ?? title}
+              />
+              &rdquo;
+            </blockquote>,
+            CONTENT_ANIM_DELAY.title
           )}
+          {content.attribution
+            ? block(
+                <p className="mt-4 text-sm" style={mutedStyle}>
+                  — {content.attribution}
+                </p>,
+                CONTENT_ANIM_DELAY.body
+              )
+            : null}
         </div>
       );
 
     default:
       return (
         <div className="flex h-full flex-col">
-          <h2 className="text-xl font-semibold" style={titleStyle}>
-            {title}
-          </h2>
-          {content.body && (
-            <p className="mt-4 text-sm" style={mutedStyle}>
-              {content.body}
-            </p>
-          )}
+          {renderTitle("text-xl font-semibold")}
+          {content.body ? renderBody("mt-4 text-sm", content.body) : null}
         </div>
       );
   }

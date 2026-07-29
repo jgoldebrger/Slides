@@ -1,4 +1,5 @@
 import type { Slide } from "@/types/slide";
+import { richTextToPlainText } from "@/lib/slides/rich-text";
 import {
   DEFAULT_AI_TTS_VOICE,
   isAiTtsVoice,
@@ -8,12 +9,16 @@ import {
 export function buildSlideNarration(slide: Slide): string {
   const parts: string[] = [];
 
-  if (slide.title?.trim()) parts.push(slide.title.trim());
+  if (slide.title?.trim()) parts.push(richTextToPlainText(slide.title));
 
-  if (slide.content.body?.trim()) parts.push(slide.content.body.trim());
+  if (slide.content.body?.trim()) {
+    parts.push(richTextToPlainText(slide.content.body));
+  }
 
   if (slide.content.bullets?.length) {
-    parts.push(slide.content.bullets.join(". "));
+    parts.push(
+      slide.content.bullets.map((b) => richTextToPlainText(b)).join(". ")
+    );
   }
 
   if (slide.content.metrics?.length) {
@@ -23,7 +28,7 @@ export function buildSlideNarration(slide: Slide): string {
   }
 
   if (slide.content.quote?.trim()) {
-    parts.push(slide.content.quote.trim());
+    parts.push(richTextToPlainText(slide.content.quote));
   }
 
   if (slide.speakerNotes?.trim()) {

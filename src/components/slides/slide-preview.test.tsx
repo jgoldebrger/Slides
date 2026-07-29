@@ -37,7 +37,7 @@ describe("SlidePreview", () => {
     expect(accentBar?.getAttribute("style")).toContain(
       "background-color: rgb(15, 118, 110)"
     );
-    const title = screen.getByText("Branded title");
+    const title = screen.getByRole("heading", { level: 2 });
     expect(title.getAttribute("style")).toContain("color: rgb(15, 118, 110)");
   });
 });

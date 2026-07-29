@@ -73,6 +73,7 @@ export const slideSchema = z.object({
   type: z.string().default("content"),
   content: z.record(z.string(), z.unknown()).default({}),
   speaker_notes: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const brandKitSchema = z.object({
