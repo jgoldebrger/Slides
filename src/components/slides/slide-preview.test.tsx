@@ -22,7 +22,7 @@ describe("SlidePreview", () => {
   });
 
   it("When branding is on, should apply primary color to title", () => {
-    const { container } = render(
+    render(
       <SlidePreview
         slide={sampleSlide}
         applyBranding
@@ -32,10 +32,6 @@ describe("SlidePreview", () => {
           fontStyle: "sans",
         }}
       />
-    );
-    const accentBar = container.querySelector('[aria-hidden="true"]');
-    expect(accentBar?.getAttribute("style")).toContain(
-      "background-color: rgb(15, 118, 110)"
     );
     const title = screen.getByRole("heading", { level: 2 });
     expect(title.getAttribute("style")).toContain("color: rgb(15, 118, 110)");

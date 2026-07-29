@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Settings2 } from "lucide-react";
 import { toast } from "sonner";
 import { getActionError } from "@/lib/action-result";
@@ -25,13 +26,18 @@ type PlayerBackgroundSettingsProps = {
   deckId: string;
   backgroundAudioUrl?: string | null;
   backgroundImageUrl?: string | null;
+  onBackgroundAudioUrlChange?: (url: string | null) => void;
+  onBackgroundImageUrlChange?: (url: string | null) => void;
 };
 
 export function PlayerBackgroundSettings({
   deckId,
   backgroundAudioUrl,
   backgroundImageUrl,
+  onBackgroundAudioUrlChange,
+  onBackgroundImageUrlChange,
 }: PlayerBackgroundSettingsProps) {
+  const router = useRouter();
   const [uploadingAudio, setUploadingAudio] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -50,7 +56,13 @@ export function PlayerBackgroundSettings({
       const result = await uploadBackgroundAudioClient(deckId, file);
       const err = getActionError(result);
       if (err) toast.error(err);
-      else toast.success("Background audio added");
+      else {
+        if ("url" in result && result.url) {
+          onBackgroundAudioUrlChange?.(result.url);
+        }
+        toast.success("Background audio added");
+        router.refresh();
+      }
       (e.target as HTMLFormElement).reset();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -74,7 +86,13 @@ export function PlayerBackgroundSettings({
       const result = await uploadBackgroundImageClient(deckId, file);
       const err = getActionError(result);
       if (err) toast.error(err);
-      else toast.success("Background image added");
+      else {
+        if ("url" in result && result.url) {
+          onBackgroundImageUrlChange?.(result.url);
+        }
+        toast.success("Background image added");
+        router.refresh();
+      }
       (e.target as HTMLFormElement).reset();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Upload failed");
@@ -123,8 +141,13 @@ export function PlayerBackgroundSettings({
                   variant="ghost"
                   onClick={async () => {
                     const r = await clearDeckBackground(deckId, "audio");
-                    if (getActionError(r)) toast.error(getActionError(r)!);
-                    else toast.success("Audio removed");
+                    const err = getActionError(r);
+                    if (err) toast.error(err);
+                    else {
+                      onBackgroundAudioUrlChange?.(null);
+                      toast.success("Audio removed");
+                      router.refresh();
+                    }
                   }}
                 >
                   Remove
@@ -156,8 +179,13 @@ export function PlayerBackgroundSettings({
                   variant="ghost"
                   onClick={async () => {
                     const r = await clearDeckBackground(deckId, "image");
-                    if (getActionError(r)) toast.error(getActionError(r)!);
-                    else toast.success("Image removed");
+                    const err = getActionError(r);
+                    if (err) toast.error(err);
+                    else {
+                      onBackgroundImageUrlChange?.(null);
+                      toast.success("Image removed");
+                      router.refresh();
+                    }
                   }}
                 >
                   Remove

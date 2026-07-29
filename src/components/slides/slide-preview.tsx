@@ -210,13 +210,6 @@ export function SlidePreview({
           backgroundUrl ? "bg-transparent" : "bg-white"
         )}
       >
-      {applyBranding && (
-        <div
-          className="mb-4 h-1 w-16 rounded-full"
-          style={{ backgroundColor: colors.primary }}
-          aria-hidden
-        />
-      )}
       <div
         key={`${slide.id}-${animationRunId}`}
         className={cn("h-full", entranceClass)}

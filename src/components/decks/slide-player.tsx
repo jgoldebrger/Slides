@@ -35,6 +35,41 @@ import { cn } from "@/lib/utils";
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 2] as const;
 const BASE_SLIDE_MS = 4000;
+/** Tiny silent WAV — unlocks background music on the same click as Play. */
+const SILENT_AUDIO_DATA_URI =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA";
+
+function createNarrationAudioContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
+  const AudioCtx =
+    window.AudioContext ||
+    (window as Window & { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!AudioCtx) return null;
+  return new AudioCtx();
+}
+
+async function unlockBackgroundAudio(audio: HTMLAudioElement | null) {
+  if (!audio) return;
+  const previousSrc = audio.getAttribute("src");
+  const wasMuted = audio.muted;
+  audio.muted = true;
+  if (!previousSrc) {
+    audio.src = SILENT_AUDIO_DATA_URI;
+  }
+  try {
+    await audio.play();
+    audio.pause();
+  } catch {
+    // Browser may still block until real playback is triggered.
+  } finally {
+    audio.muted = wasMuted;
+    audio.currentTime = 0;
+    if (!previousSrc) {
+      audio.removeAttribute("src");
+    }
+  }
+}
 
 type SlidePlayerProps = {
   deckId: string;
@@ -78,12 +113,19 @@ export function SlidePlayer({
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [bulletStep, setBulletStep] = useState<number | null>(null);
+  const [resolvedBgAudioUrl, setResolvedBgAudioUrl] = useState(
+    backgroundAudioUrl ?? null
+  );
+  const [resolvedBgImageUrl, setResolvedBgImageUrl] = useState(
+    backgroundImageUrl ?? null
+  );
 
   const bgAudioRef = useRef<HTMLAudioElement | null>(null);
-  const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
-  const narrationObjectUrlRef = useRef<string | null>(null);
+  const narrationContextRef = useRef<AudioContext | null>(null);
+  const narrationSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const narrateAbortRef = useRef<AbortController | null>(null);
   const narrationCacheRef = useRef<Map<string, Blob>>(new Map());
+  const narrationDecodeCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
   const narrationInflightRef = useRef<Map<string, Promise<Blob>>>(new Map());
   const presentationRef = useRef<HTMLDivElement | null>(null);
   const playingRef = useRef(false);
@@ -136,6 +178,11 @@ export function SlidePlayer({
         }
 
         const blob = await res.blob();
+        const contentType = res.headers.get("content-type") ?? blob.type;
+        if (!contentType.includes("audio") || blob.size < 64) {
+          throw new Error("Server returned an invalid audio response");
+        }
+
         narrationCacheRef.current.set(key, blob);
         return blob;
       })();
@@ -167,20 +214,32 @@ export function SlidePlayer({
     [fetchNarrationBlob, narrationCacheKey, narrationEnabled, sorted]
   );
 
+  const unlockNarrationAudio = useCallback(async () => {
+    if (!narrationContextRef.current) {
+      narrationContextRef.current = createNarrationAudioContext();
+    }
+    const ctx = narrationContextRef.current;
+    if (!ctx || ctx.state === "closed") return;
+    if (ctx.state === "suspended") {
+      await ctx.resume();
+    }
+  }, []);
+
   const stopNarrationAudio = useCallback(() => {
     narrateAbortRef.current?.abort();
     narrateAbortRef.current = null;
-    const audio = narrationAudioRef.current;
-    if (audio) {
-      audio.onended = null;
-      audio.onerror = null;
-      audio.pause();
-      audio.removeAttribute("src");
+
+    const source = narrationSourceRef.current;
+    if (source) {
+      try {
+        source.stop();
+      } catch {
+        // Already stopped.
+      }
+      source.disconnect();
+      narrationSourceRef.current = null;
     }
-    if (narrationObjectUrlRef.current) {
-      URL.revokeObjectURL(narrationObjectUrlRef.current);
-      narrationObjectUrlRef.current = null;
-    }
+
     setNarrationLoading(false);
   }, []);
 
@@ -192,7 +251,16 @@ export function SlidePlayer({
   }, [shareMode]);
 
   useEffect(() => {
+    setResolvedBgAudioUrl(backgroundAudioUrl ?? null);
+  }, [backgroundAudioUrl]);
+
+  useEffect(() => {
+    setResolvedBgImageUrl(backgroundImageUrl ?? null);
+  }, [backgroundImageUrl]);
+
+  useEffect(() => {
     narrationCacheRef.current.clear();
+    narrationDecodeCacheRef.current.clear();
     narrationInflightRef.current.clear();
   }, [narrationVoice, playbackSpeed]);
 
@@ -259,35 +327,72 @@ export function SlidePlayer({
   }, [advanceBulletOrSlide, goTo, sorted.length]);
 
   const playNarrationBlob = useCallback(
-    async (blob: Blob, abort: AbortSignal) => {
+    async (blob: Blob, abort: AbortSignal, cacheKey: string) => {
       if (abort.aborted || !playingRef.current) return;
 
-      if (narrationObjectUrlRef.current) {
-        URL.revokeObjectURL(narrationObjectUrlRef.current);
+      if (!narrationContextRef.current) {
+        narrationContextRef.current = createNarrationAudioContext();
       }
-      const url = URL.createObjectURL(blob);
-      narrationObjectUrlRef.current = url;
-
-      const audio = narrationAudioRef.current;
-      if (!audio) {
+      const ctx = narrationContextRef.current;
+      if (!ctx || ctx.state === "closed") {
         setNarrationLoading(false);
-        toast.error("Audio player is not ready. Try play again.");
+        toast.error("Audio is not available in this browser.");
         setPlaying(false);
         playingRef.current = false;
         return;
       }
 
-      audio.src = url;
-      audio.playbackRate = 1;
-      audio.onended = () => advanceOrStop();
-      audio.onerror = () => {
-        toast.error("AI voice playback failed");
-        setPlaying(false);
-        playingRef.current = false;
+      if (ctx.state === "suspended") {
+        try {
+          await ctx.resume();
+        } catch {
+          setNarrationLoading(false);
+          toast.error("Click play to allow audio in your browser.");
+          setPlaying(false);
+          playingRef.current = false;
+          return;
+        }
+      }
+
+      let buffer = narrationDecodeCacheRef.current.get(cacheKey);
+      if (!buffer) {
+        try {
+          const arrayBuffer = await blob.arrayBuffer();
+          if (abort.aborted || !playingRef.current) return;
+          buffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+          narrationDecodeCacheRef.current.set(cacheKey, buffer);
+        } catch {
+          setNarrationLoading(false);
+          toast.error("Could not decode AI voice audio.");
+          setPlaying(false);
+          playingRef.current = false;
+          return;
+        }
+      }
+
+      const active = narrationSourceRef.current;
+      if (active) {
+        try {
+          active.stop();
+        } catch {
+          // Already stopped.
+        }
+        active.disconnect();
+        narrationSourceRef.current = null;
+      }
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      source.onended = () => {
+        narrationSourceRef.current = null;
+        advanceOrStop();
       };
+      narrationSourceRef.current = source;
       setNarrationLoading(false);
+
       try {
-        await audio.play();
+        source.start(0);
         prefetchNarration(indexRef.current + 1);
       } catch {
         toast.error("Could not play audio. Click play again.");
@@ -322,7 +427,7 @@ export function SlidePlayer({
     void (async () => {
       try {
         const blob = cached ?? (await fetchNarrationBlob(slide.id, abort.signal));
-        await playNarrationBlob(blob, abort.signal);
+        await playNarrationBlob(blob, abort.signal, cacheKey);
         prefetchNarration(indexRef.current + 2);
       } catch (err) {
         if (abort.signal.aborted) return;
@@ -398,6 +503,8 @@ export function SlidePlayer({
   useEffect(() => {
     return () => {
       stopNarrationAudio();
+      void narrationContextRef.current?.close();
+      narrationContextRef.current = null;
       bgAudioRef.current?.pause();
     };
   }, [stopNarrationAudio]);
@@ -432,8 +539,23 @@ export function SlidePlayer({
   }, []);
 
   const togglePlay = useCallback(() => {
-    setPlaying((p) => !p);
-  }, []);
+    if (playingRef.current) {
+      setPlaying(false);
+      return;
+    }
+
+    void (async () => {
+      try {
+        await unlockNarrationAudio();
+        await unlockBackgroundAudio(bgAudioRef.current);
+        if (!playingRef.current) {
+          setPlaying(true);
+        }
+      } catch {
+        toast.error("Click play to allow audio in your browser.");
+      }
+    })();
+  }, [unlockNarrationAudio]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -530,17 +652,28 @@ export function SlidePlayer({
           {!viewerMode && !shareMode && (
             <PlayerBackgroundSettings
               deckId={deckId}
-              backgroundAudioUrl={backgroundAudioUrl}
-              backgroundImageUrl={backgroundImageUrl}
+              backgroundAudioUrl={resolvedBgAudioUrl}
+              backgroundImageUrl={resolvedBgImageUrl}
+              onBackgroundAudioUrlChange={setResolvedBgAudioUrl}
+              onBackgroundImageUrlChange={setResolvedBgImageUrl}
             />
           )}
         </div>
       )}
 
-      {backgroundAudioUrl && (
-        <audio ref={bgAudioRef} src={backgroundAudioUrl} loop preload="auto" />
-      )}
-      <audio ref={narrationAudioRef} preload="auto" className="hidden" />
+      {resolvedBgAudioUrl ? (
+        <audio
+          ref={bgAudioRef}
+          src={resolvedBgAudioUrl}
+          loop
+          preload="auto"
+          onError={() =>
+            toast.error(
+              "Background music could not load. Try re-uploading the file."
+            )
+          }
+        />
+      ) : null}
 
       <div
         ref={presentationRef}
@@ -571,16 +704,16 @@ export function SlidePlayer({
               isFullscreen && "min-h-0 flex-1"
             )}
             style={
-              backgroundImageUrl
+              resolvedBgImageUrl
                 ? {
-                    backgroundImage: `url(${backgroundImageUrl})`,
+                    backgroundImage: `url(${resolvedBgImageUrl})`,
                     backgroundSize: "cover",
                     backgroundPosition: "center",
                   }
                 : undefined
             }
           >
-            {backgroundImageUrl && (
+            {resolvedBgImageUrl && (
               <div className="absolute inset-0 bg-black/55" aria-hidden />
             )}
             <div className="relative flex h-full items-center justify-center p-4 sm:p-8">
@@ -738,7 +871,7 @@ export function SlidePlayer({
                 </span>
               ) : null}
 
-              {backgroundAudioUrl ? (
+              {resolvedBgAudioUrl ? (
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
