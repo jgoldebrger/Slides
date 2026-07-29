@@ -71,8 +71,7 @@ export function DeckGeneratingBanner({
       <div>
         <p className="text-sm font-medium">Generating slide content…</p>
         <p className="text-xs text-muted-foreground">
-          AI is filling slides from your approved outline. This may take a
-          minute.
+          Building slides from your AI outline. This may take a minute.
         </p>
       </div>
     </div>

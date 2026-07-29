@@ -140,7 +140,7 @@ export default async function DeckEditorPage({
           title={deck.status === "generating" ? "Generating slides" : "No slides yet"}
           description={
             deck.status === "generating"
-              ? "AI is filling slide content from your approved outline."
+              ? "Building slides from your AI outline."
               : "Approve an outline to create slides, or add slides manually."
           }
           action={

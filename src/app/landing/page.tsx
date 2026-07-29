@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { Logo } from "@/components/shared/logo";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = { title: "Home" };
@@ -54,9 +55,7 @@ export default function LandingPage() {
         <div data-theme="dark" className="relative text-foreground">
           <header className="relative z-20 border-b border-border bg-background/80 backdrop-blur-md">
             <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
-              <span className="text-xl font-semibold tracking-tight text-link">
-                UpdateDeck
-              </span>
+              <Logo href="/" size="lg" />
               <nav className="flex items-center gap-3" aria-label="Account">
                 <Button variant="ghost" asChild>
                   <Link href="/login">Sign in</Link>

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Logo } from "@/components/shared/logo";
 
 export function AuthShell({ children }: { children: React.ReactNode }) {
   return (
@@ -29,12 +29,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
       <div className="relative z-10 min-h-screen lg:grid lg:grid-cols-2">
         <aside className="relative hidden flex-col justify-between p-10 xl:p-14 lg:flex">
-          <Link
-            href="/"
-            className="text-xl font-semibold tracking-tight text-link"
-          >
-            UpdateDeck
-          </Link>
+          <Logo href="/" size="lg" />
           <div className="max-w-md">
             <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">
               Project status decks
@@ -54,12 +49,7 @@ export function AuthShell({ children }: { children: React.ReactNode }) {
 
         <main className="flex min-h-screen flex-col justify-center px-4 py-12 sm:px-8 lg:px-12 xl:px-16">
           <div className="mb-8 lg:hidden">
-            <Link
-              href="/"
-              className="text-xl font-semibold tracking-tight text-link"
-            >
-              UpdateDeck
-            </Link>
+            <Logo href="/" size="lg" />
           </div>
           <div className="mx-auto w-full max-w-md rounded-lg border border-border bg-card p-8 sm:p-10">
             {children}

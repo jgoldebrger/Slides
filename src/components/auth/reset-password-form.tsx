@@ -6,7 +6,7 @@ import { useState } from "react";
 import { AuthFormHeader } from "@/components/auth/auth-form-header";
 import { updatePasswordAction } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 
 export function ResetPasswordForm() {
@@ -44,9 +44,8 @@ export function ResetPasswordForm() {
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="space-y-2">
           <Label htmlFor="password">New password</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
@@ -58,9 +57,8 @@ export function ResetPasswordForm() {
         </div>
         <div className="space-y-2">
           <Label htmlFor="confirm">Confirm password</Label>
-          <Input
+          <PasswordInput
             id="confirm"
-            type="password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             required
