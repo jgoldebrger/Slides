@@ -1,3 +1,4 @@
+import type PptxGenJS from "pptxgenjs";
 import type { BrandTheme } from "@/lib/brand";
 import {
   PPTX_FONT_MAP,
