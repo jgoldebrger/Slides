@@ -37,4 +37,25 @@ describe("generatePptxBuffer", () => {
     expect(buffer.length).toBeGreaterThan(1000);
     expect(buffer.subarray(0, 2).toString()).toBe("PK");
   });
+
+  it("When compact bullets deck exported, should still produce valid pptx", async () => {
+    const slides: Slide[] = [
+      {
+        id: "1",
+        order: 0,
+        type: "content",
+        layout: "bullets",
+        title: "Updates",
+        content: {
+          bullets: ["a", "b", "c", "d", "e", "f"],
+        },
+      },
+    ];
+    const buffer = await generatePptxBuffer(slides, "Compact", {
+      primaryColor: "#171717",
+      accentColor: "#2563eb",
+      fontStyle: "sans",
+    });
+    expect(buffer.subarray(0, 2).toString()).toBe("PK");
+  });
 });

@@ -41,28 +41,29 @@ function addTitleSlideBranding(
   colors: SlideColors,
   logoUrl?: string | null
 ) {
+  const composition = resolveLayoutComposition(slide, { branded: true });
   addBrandedAccentBar(pptxSlide, colors);
 
-  let titleY = 1.8;
+  let titleY = composition.titleYIn + 0.25;
   if (logoUrl) {
     pptxSlide.addImage({
       path: logoUrl,
       x: 3.5,
-      y: 0.9,
+      y: composition.titleYIn - 0.15,
       w: 3,
       h: 0.75,
       sizing: { type: "contain", w: 3, h: 0.75 },
     });
-    titleY = 2.2;
+    titleY = composition.titleYIn + 0.65;
   }
 
   const font = PPTX_FONT_MAP[theme.fontStyle];
   pptxSlide.addText(richTextToPlainText(slide.title), {
-    x: 0.5,
+    x: composition.paddingIn,
     y: titleY,
-    w: 9,
-    h: 1.2,
-    fontSize: 32,
+    w: PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2,
+    h: composition.titleHeightIn,
+    fontSize: composition.typography.titlePt,
     bold: true,
     align: "center",
     color: stripHexHash(colors.primary),
@@ -71,11 +72,11 @@ function addTitleSlideBranding(
 
   if (slide.content.body) {
     pptxSlide.addText(richTextToPlainText(slide.content.body), {
-      x: 1,
-      y: titleY + 1.1,
-      w: 8,
-      h: 0.8,
-      fontSize: 18,
+      x: composition.paddingIn + 0.5,
+      y: titleY + composition.titleHeightIn + 0.1,
+      w: PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2 - 1,
+      h: composition.contentGapIn,
+      fontSize: composition.typography.bodyPt,
       align: "center",
       color: stripHexHash(colors.muted),
       fontFace: font,
