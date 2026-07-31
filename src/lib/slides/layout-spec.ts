@@ -190,3 +190,65 @@ export function buildLayoutComposition(
     contentOverflow: density === "compact" ? "auto" : "visible",
   };
 }
+
+const TITLE_CLASS: Record<LayoutDensity, string> = {
+  airy: "font-bold tracking-tight",
+  comfort: "font-semibold tracking-tight",
+  compact: "font-semibold",
+};
+
+export type PreviewCompositionStyles = {
+  paddingPx: number;
+  titleClass: string;
+  titleStyle: { fontSize: string };
+  bodyClass: string;
+  bodyStyle: { fontSize: string };
+  bulletClass: string;
+  bulletStyle: { fontSize: string };
+  contentClass: string;
+  titleMarginBottomPx: number;
+  contentGapPx: number;
+};
+
+export function resolveLayoutComposition(
+  slide: Slide,
+  options?: { branded?: boolean }
+): LayoutComposition {
+  const signals = countContentSignals(slide);
+  const density = pickDensity(slide.layout, signals);
+  return buildLayoutComposition(slide.layout, density, options);
+}
+
+export function compositionToPreviewStyles(
+  composition: LayoutComposition
+): PreviewCompositionStyles {
+  const paddingPx = inToPx(composition.paddingIn);
+  const bodySizePx = ptToPx(composition.typography.bodyPt);
+  const bulletSizePx = ptToPx(composition.typography.bulletPt);
+  const titleMarginBottomPx = inToPx(
+    composition.contentYIn -
+      composition.titleYIn -
+      composition.titleHeightIn
+  );
+
+  const bulletSpacing =
+    composition.density === "airy"
+      ? "space-y-3"
+      : composition.density === "comfort"
+        ? "space-y-2"
+        : "space-y-1";
+
+  return {
+    paddingPx,
+    titleClass: TITLE_CLASS[composition.density],
+    titleStyle: { fontSize: `${ptToPx(composition.typography.titlePt)}px` },
+    bodyClass: composition.density === "compact" ? "" : "leading-relaxed",
+    bodyStyle: { fontSize: `${bodySizePx}px` },
+    bulletClass: `list-disc pl-5 ${bulletSpacing}`,
+    bulletStyle: { fontSize: `${bulletSizePx}px` },
+    contentClass:
+      composition.contentOverflow === "auto" ? "min-h-0 overflow-auto" : "",
+    titleMarginBottomPx,
+    contentGapPx: inToPx(composition.contentGapIn),
+  };
+}
