@@ -94,13 +94,27 @@ export const mapMetricsGridLayout: PptxLayoutMapper = ({
   metrics.forEach((m, i) => {
     const col = i % cols;
     const row = Math.floor(i / cols);
-    pptxSlide.addText(`${m.value}\n${m.label}`, {
-      x: composition.paddingIn + col * (colW + 0.15),
-      y: composition.contentYIn + row * rowH,
+    const x = composition.paddingIn + col * (colW + 0.15);
+    const y = composition.contentYIn + row * rowH;
+    const valueH = rowH * 0.55;
+    const labelH = rowH * 0.45;
+
+    pptxSlide.addText(m.value, {
+      x,
+      y,
       w: colW,
-      h: rowH,
+      h: valueH,
       fontSize: composition.typography.metricValuePt,
       color: stripHex(colors.accent),
+      fontFace: font,
+    });
+    pptxSlide.addText(m.label, {
+      x,
+      y: y + valueH,
+      w: colW,
+      h: labelH,
+      fontSize: composition.typography.metricLabelPt,
+      color: stripHex(colors.muted),
       fontFace: font,
     });
   });

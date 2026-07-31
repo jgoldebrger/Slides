@@ -8,6 +8,7 @@ import {
 } from "@/lib/slides/layout-theme";
 import { PPTX_LAYOUT_MAPPERS } from "@/lib/export/layouts/registry";
 import {
+  BRANDED_ACCENT_BAR,
   PPTX_SLIDE_WIDTH_IN,
   resolveLayoutComposition,
 } from "@/lib/slides/layout-spec";
@@ -25,10 +26,10 @@ type PptxSlide = PptxGenJS.Slide;
 
 function addBrandedAccentBar(pptxSlide: PptxSlide, colors: SlideColors) {
   pptxSlide.addShape("rect", {
-    x: 0.5,
-    y: 0.35,
-    w: 1.2,
-    h: 0.06,
+    x: BRANDED_ACCENT_BAR.xIn,
+    y: BRANDED_ACCENT_BAR.yIn,
+    w: BRANDED_ACCENT_BAR.widthIn,
+    h: BRANDED_ACCENT_BAR.heightIn,
     fill: { color: stripHexHash(colors.primary) },
     line: { color: stripHexHash(colors.primary), width: 0 },
   });

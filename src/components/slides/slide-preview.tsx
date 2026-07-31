@@ -165,6 +165,73 @@ function AnimatedBlock({
   );
 }
 
+function PreviewBrandedAccentBar({
+  layoutStyles,
+  color,
+}: {
+  layoutStyles: PreviewCompositionStyles;
+  color: string;
+}) {
+  return (
+    <div
+      aria-hidden
+      className="absolute"
+      style={{
+        top: layoutStyles.accentBarTopPx,
+        left: layoutStyles.accentBarLeftPx,
+        width: layoutStyles.accentBarWidthPx,
+        height: layoutStyles.accentBarHeightPx,
+        backgroundColor: color,
+      }}
+    />
+  );
+}
+
+function PreviewZonedLayout({
+  layoutStyles,
+  showAccentBar,
+  accentColor,
+  title,
+  children,
+}: {
+  layoutStyles: PreviewCompositionStyles;
+  showAccentBar: boolean;
+  accentColor: string;
+  title: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative h-full w-full">
+      {showAccentBar && (
+        <PreviewBrandedAccentBar layoutStyles={layoutStyles} color={accentColor} />
+      )}
+      <div
+        className="absolute overflow-hidden"
+        style={{
+          top: layoutStyles.titleTopPx,
+          left: layoutStyles.paddingXPx,
+          right: layoutStyles.paddingXPx,
+          height: layoutStyles.titleHeightPx,
+        }}
+      >
+        {title}
+      </div>
+      <div
+        className={cn("absolute flex min-h-0 flex-col", layoutStyles.contentClass)}
+        style={{
+          top: layoutStyles.contentTopPx,
+          left: layoutStyles.paddingXPx,
+          right: layoutStyles.paddingXPx,
+          height: layoutStyles.contentHeightPx,
+          gap: layoutStyles.contentGapPx,
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function SlidePreview({
   slide,
   className,
@@ -221,7 +288,6 @@ export function SlidePreview({
           "relative z-10 h-full",
           backgroundUrl ? "bg-transparent" : "bg-white"
         )}
-        style={{ padding: layoutStyles.paddingPx }}
       >
       <div
         key={`${slide.id}-${animationRunId}`}
@@ -284,11 +350,27 @@ function SlideLayoutContent({
     fontSize: `${ptToPx(composition.typography.metricLabelPt)}px`,
     color: colors.muted,
   };
-  const contentWrapperClass = cn("flex h-full flex-col", layoutStyles.contentClass);
-  const gridGapClass =
-    composition.density === "airy" ? "gap-4" : composition.density === "comfort" ? "gap-3" : "gap-2";
+  const gridGapStyle = { gap: layoutStyles.contentGapPx };
   const metricsGridClass =
     composition.metricsCols === 3 ? "grid-cols-3" : "grid-cols-2";
+  const showAccentBar =
+    composition.branded && layout !== "title" && layout !== "quote";
+
+  const wrapZoned = (
+    children: React.ReactNode,
+    titleOverride?: React.ReactNode | null
+  ) => (
+    <PreviewZonedLayout
+      layoutStyles={layoutStyles}
+      showAccentBar={showAccentBar}
+      accentColor={colors.primary}
+      title={
+        titleOverride === null ? null : titleOverride ?? renderTitle()
+      }
+    >
+      {children}
+    </PreviewZonedLayout>
+  );
 
   const block = (
     node: React.ReactNode,
@@ -313,7 +395,6 @@ function SlideLayoutContent({
         style={{
           ...titleStyle,
           ...layoutStyles.titleStyle,
-          marginBottom: layoutStyles.titleMarginBottomPx,
         }}
       >
         <RichTextContent html={title} />
@@ -376,30 +457,45 @@ function SlideLayoutContent({
   switch (layout) {
     case "title":
       return (
-        <div className="flex h-full flex-col items-center justify-center text-center">
-          {logoUrl &&
-            block(
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logoUrl}
-                alt=""
-                className="mb-6 max-h-16 max-w-[200px] object-contain"
-              />,
-              0
-            )}
-          {renderTitle()}
-          {content.body ? renderBody("mt-4", content.body) : null}
+        <div className="relative h-full w-full">
+          {composition.branded && (
+            <PreviewBrandedAccentBar
+              layoutStyles={layoutStyles}
+              color={colors.primary}
+            />
+          )}
+          <div
+            className="flex h-full flex-col items-center justify-center text-center"
+            style={{
+              paddingLeft: layoutStyles.paddingXPx,
+              paddingRight: layoutStyles.paddingXPx,
+            }}
+          >
+            {logoUrl &&
+              block(
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={logoUrl}
+                  alt=""
+                  className="mb-6 max-h-16 max-w-[200px] object-contain"
+                />,
+                0
+              )}
+            {renderTitle()}
+            {content.body ? renderBody("mt-4", content.body) : null}
+          </div>
         </div>
       );
 
     case "section_break":
-      return (
+      return wrapZoned(
         <div
           className="flex h-full items-center border-l-4 pl-6"
           style={{ borderColor: colors.primary }}
         >
           {renderTitle()}
-        </div>
+        </div>,
+        null
       );
 
     case "bullets": {
@@ -409,31 +505,30 @@ function SlideLayoutContent({
           ? allBullets.slice(0, visibleBulletCount)
           : allBullets;
       if (content.imageUrl) {
-        return (
-          <div className={contentWrapperClass}>
-            {renderTitle()}
-            <div className={cn("grid min-h-0 flex-1 grid-cols-2", gridGapClass)}>
-              <div className={cn("min-h-0", layoutStyles.contentClass)}>
-                {renderBullets(bullets)}
-                {content.body ? renderBody("mt-3", content.body) : null}
-              </div>
-              {renderImage(content.imageUrl, {
-                imageAlt: content.imageAlt,
-                maxHeight: "max-h-full",
-                className: "h-full",
-                wrapperClassName:
-                  "flex items-center justify-center rounded-lg bg-muted/30 p-2",
-              })}
+        return wrapZoned(
+          <div
+            className="grid min-h-0 flex-1 grid-cols-2"
+            style={gridGapStyle}
+          >
+            <div className="min-h-0">
+              {renderBullets(bullets)}
+              {content.body ? renderBody("mt-3", content.body) : null}
             </div>
+            {renderImage(content.imageUrl, {
+              imageAlt: content.imageAlt,
+              maxHeight: "max-h-full",
+              className: "h-full",
+              wrapperClassName:
+                "flex items-center justify-center rounded-lg bg-muted/30 p-2",
+            })}
           </div>
         );
       }
-      return (
-        <div className={contentWrapperClass}>
-          {renderTitle()}
+      return wrapZoned(
+        <>
           {renderBullets(bullets)}
           {content.body ? renderBody("mt-3", content.body) : null}
-        </div>
+        </>
       );
     }
 
@@ -441,11 +536,13 @@ function SlideLayoutContent({
       const metrics = content.metrics ?? [];
       const fallbackBullets =
         metrics.length === 0 ? (content.bullets ?? []) : [];
-      return (
-        <div className={contentWrapperClass}>
-          {renderTitle()}
+      return wrapZoned(
+        <>
           {metrics.length > 0 ? (
-            <div className={cn("grid flex-1", metricsGridClass, gridGapClass)}>
+            <div
+              className={cn("grid flex-1 min-h-0", metricsGridClass)}
+              style={gridGapStyle}
+            >
               {metrics.map((metric, i) =>
                 block(
                   <div
@@ -475,7 +572,7 @@ function SlideLayoutContent({
           {!metrics.length && !fallbackBullets.length && content.body
             ? renderBody(undefined, content.body)
             : null}
-        </div>
+        </>
       );
     }
 
@@ -484,14 +581,16 @@ function SlideLayoutContent({
         visibleBulletCount != null
           ? (content.bullets ?? []).slice(0, visibleBulletCount)
           : (content.bullets ?? []);
-      return (
-        <div className={contentWrapperClass}>
-          {renderTitle()}
-          {block(
-            <div
-              className={cn(staggerBullets && "slide-bullet-stagger")}
-              style={{ display: "flex", flexDirection: "column", gap: layoutStyles.contentGapPx }}
-            >
+      return wrapZoned(
+        block(
+          <div
+            className={cn(staggerBullets && "slide-bullet-stagger")}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: layoutStyles.contentGapPx,
+            }}
+          >
               {timelineItems.map((item, i) => (
                 <div key={i} className="flex items-start gap-3">
                   <span
@@ -505,8 +604,7 @@ function SlideLayoutContent({
               ))}
             </div>,
             CONTENT_ANIM_DELAY.bullets
-          )}
-        </div>
+          )
       );
     }
 
@@ -521,68 +619,67 @@ function SlideLayoutContent({
       const right = bullets.slice(mid);
 
       if (content.imageUrl) {
-        return (
-          <div className={contentWrapperClass}>
-            {renderTitle()}
-            <div className={cn("grid min-h-0 flex-1 grid-cols-2", gridGapClass)}>
-              <div className={cn("min-h-0", layoutStyles.contentClass)}>
-                {renderBullets(left.length ? left : bullets)}
-                {content.body ? renderBody("mt-3", content.body) : null}
-              </div>
-              <div className="flex flex-col gap-3">
-                {renderImage(content.imageUrl, {
-                  imageAlt: content.imageAlt,
-                  maxHeight: "max-h-full",
-                  wrapperClassName:
-                    "flex flex-1 items-center justify-center rounded-lg bg-muted/30 p-2",
-                })}
-                {right.length > 0
-                  ? renderBullets(right, { applyStep: false })
-                  : null}
-              </div>
+        return wrapZoned(
+          <div
+            className="grid min-h-0 flex-1 grid-cols-2"
+            style={gridGapStyle}
+          >
+            <div className="min-h-0">
+              {renderBullets(left.length ? left : bullets)}
+              {content.body ? renderBody("mt-3", content.body) : null}
+            </div>
+            <div className="flex flex-col" style={gridGapStyle}>
+              {renderImage(content.imageUrl, {
+                imageAlt: content.imageAlt,
+                maxHeight: "max-h-full",
+                wrapperClassName:
+                  "flex flex-1 items-center justify-center rounded-lg bg-muted/30 p-2",
+              })}
+              {right.length > 0
+                ? renderBullets(right, { applyStep: false })
+                : null}
             </div>
           </div>
         );
       }
 
-      return (
-        <div className={contentWrapperClass}>
-          {renderTitle()}
-          <div className={cn("grid flex-1 grid-cols-2", gridGapClass)}>
+      return wrapZoned(
+        <>
+          <div className="grid flex-1 min-h-0 grid-cols-2" style={gridGapStyle}>
             {renderBullets(left, { applyStep: false })}
             {renderBullets(right, { applyStep: false })}
           </div>
           {content.body ? renderBody("mt-3", content.body) : null}
-        </div>
+        </>
       );
     }
 
     case "image_caption":
-      return (
-        <div className={contentWrapperClass}>
-          {renderTitle()}
-          <div className={cn("grid min-h-0 flex-1 grid-cols-2", gridGapClass)}>
-            <div className={cn("min-h-0", layoutStyles.contentClass)}>
-              {renderBullets(content.bullets ?? [])}
-              {content.body ? renderBody(undefined, content.body) : null}
-            </div>
-            {content.imageUrl
-              ? renderImage(content.imageUrl, {
-                  imageAlt: content.imageAlt,
-                  maxHeight: "max-h-full",
-                  wrapperClassName:
-                    "flex items-center justify-center rounded-lg p-2",
-                })
-              : block(
-                  <div
-                    className="flex items-center justify-center rounded-lg p-2"
-                    style={{ backgroundColor: `${colors.border}80` }}
-                  >
-                    <span className="text-sm opacity-50">Image placeholder</span>
-                  </div>,
-                  CONTENT_ANIM_DELAY.image
-                )}
+      return wrapZoned(
+        <div
+          className="grid min-h-0 flex-1 grid-cols-2"
+          style={gridGapStyle}
+        >
+          <div className="min-h-0">
+            {renderBullets(content.bullets ?? [])}
+            {content.body ? renderBody(undefined, content.body) : null}
           </div>
+          {content.imageUrl
+            ? renderImage(content.imageUrl, {
+                imageAlt: content.imageAlt,
+                maxHeight: "max-h-full",
+                wrapperClassName:
+                  "flex items-center justify-center rounded-lg p-2",
+              })
+            : block(
+                <div
+                  className="flex items-center justify-center rounded-lg p-2"
+                  style={{ backgroundColor: `${colors.border}80` }}
+                >
+                  <span className="text-sm opacity-50">Image placeholder</span>
+                </div>,
+                CONTENT_ANIM_DELAY.image
+              )}
         </div>
       );
 
@@ -591,9 +688,8 @@ function SlideLayoutContent({
         Array.isArray(content.chartData) && content.chartData.length > 0;
       const hasMetrics =
         Array.isArray(content.metrics) && content.metrics.length > 0;
-      return (
-        <div className={contentWrapperClass}>
-          {renderTitle()}
+      return wrapZoned(
+        <>
           {hasChart || hasMetrics
             ? block(
                 <SlideChartPreview
@@ -606,13 +702,26 @@ function SlideLayoutContent({
               )
             : renderBullets(content.bullets ?? [])}
           {content.body ? renderBody("mt-2", content.body) : null}
-        </div>
+        </>
       );
     }
 
     case "quote":
       return (
-        <div className="flex h-full flex-col items-center justify-center text-center">
+        <div className="relative h-full w-full">
+          {composition.branded && (
+            <PreviewBrandedAccentBar
+              layoutStyles={layoutStyles}
+              color={colors.primary}
+            />
+          )}
+          <div
+            className="flex h-full flex-col items-center justify-center text-center"
+            style={{
+              paddingLeft: layoutStyles.paddingXPx,
+              paddingRight: layoutStyles.paddingXPx,
+            }}
+          >
           {block(
             <blockquote
               className="font-medium italic"
@@ -637,15 +746,13 @@ function SlideLayoutContent({
                 CONTENT_ANIM_DELAY.body
               )
             : null}
+          </div>
         </div>
       );
 
     default:
-      return (
-        <div className={contentWrapperClass}>
-          {renderTitle()}
-          {content.body ? renderBody("mt-4", content.body) : null}
-        </div>
+      return wrapZoned(
+        content.body ? renderBody("mt-4", content.body) : null
       );
   }
 }

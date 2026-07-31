@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  BRANDED_ACCENT_BAR,
   buildLayoutComposition,
   compositionToPreviewStyles,
   inToPx,
+  inToPy,
   ptToPx,
   resolveLayoutComposition,
 } from "@/lib/slides/layout-spec";
@@ -23,12 +25,57 @@ describe("resolveLayoutComposition", () => {
     const comp = resolveLayoutComposition(slide);
     expect(comp.density).toBe("compact");
   });
+
+  it("When unknown layout, should fall back to bullets composition", () => {
+    const slide: Slide = {
+      id: "1",
+      order: 0,
+      type: "content",
+      layout: "not_a_layout" as Slide["layout"],
+      title: "T",
+      content: { bullets: ["a"] },
+    };
+    const comp = resolveLayoutComposition(slide);
+    expect(comp.layout).toBe("bullets");
+  });
+});
+
+describe("isExtremeVolume", () => {
+  it("When 6 bullets compact, should not flag extreme", () => {
+    const slide: Slide = {
+      id: "1",
+      order: 0,
+      type: "content",
+      layout: "bullets",
+      title: "T",
+      content: { bullets: ["1", "2", "3", "4", "5", "6"] },
+    };
+    const comp = resolveLayoutComposition(slide);
+    expect(comp.density).toBe("compact");
+    expect(comp.contentOverflow).toBe("visible");
+  });
+
+  it("When 9 bullets compact, should enable overflow", () => {
+    const slide: Slide = {
+      id: "1",
+      order: 0,
+      type: "content",
+      layout: "bullets",
+      title: "T",
+      content: {
+        bullets: ["1", "2", "3", "4", "5", "6", "7", "8", "9"],
+      },
+    };
+    const comp = resolveLayoutComposition(slide);
+    expect(comp.contentOverflow).toBe("auto");
+  });
 });
 
 describe("preview vs pptx parity", () => {
-  it("When airy branded bullets, contentY px should match inch conversion", () => {
+  it("When airy branded bullets, contentTopPx should match inToPy(contentYIn)", () => {
     const comp = buildLayoutComposition("bullets", "airy", { branded: true });
-    expect(inToPx(comp.contentYIn)).toBeCloseTo(comp.contentYIn * 96, 5);
+    const styles = compositionToPreviewStyles(comp);
+    expect(styles.contentTopPx).toBeCloseTo(inToPy(comp.contentYIn), 1);
   });
 
   it("When comfort density, title pt should match title preview font size", () => {
@@ -37,5 +84,23 @@ describe("preview vs pptx parity", () => {
     expect(styles.titleStyle.fontSize).toBe(
       `${ptToPx(comp.typography.titlePt)}px`
     );
+  });
+
+  it("When branded accent bar, preview px should match PPTX inch constants", () => {
+    const comp = buildLayoutComposition("bullets", "comfort", { branded: true });
+    const styles = compositionToPreviewStyles(comp);
+    expect(styles.accentBarTopPx).toBeCloseTo(inToPy(BRANDED_ACCENT_BAR.yIn), 1);
+    expect(styles.accentBarWidthPx).toBeCloseTo(inToPx(BRANDED_ACCENT_BAR.widthIn), 1);
+    expect(styles.accentBarHeightPx).toBeCloseTo(
+      inToPy(BRANDED_ACCENT_BAR.heightIn),
+      1
+    );
+  });
+
+  it("When comfort bullets, title band height should match composition", () => {
+    const comp = buildLayoutComposition("bullets", "comfort");
+    const styles = compositionToPreviewStyles(comp);
+    expect(styles.titleTopPx).toBeCloseTo(inToPy(comp.titleYIn), 1);
+    expect(styles.titleHeightPx).toBeCloseTo(inToPy(comp.titleHeightIn), 1);
   });
 });

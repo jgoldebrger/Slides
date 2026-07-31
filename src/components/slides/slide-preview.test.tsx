@@ -21,22 +21,6 @@ describe("SlidePreview", () => {
     expect(accentBars.length).toBe(0);
   });
 
-  it("When branding is on, should apply primary color to title", () => {
-    render(
-      <SlidePreview
-        slide={sampleSlide}
-        applyBranding
-        brandTheme={{
-          primaryColor: "#0F766E",
-          accentColor: "#C55221",
-          fontStyle: "sans",
-        }}
-      />
-    );
-    const title = screen.getByRole("heading", { level: 2 });
-    expect(title.getAttribute("style")).toContain("color: rgb(15, 118, 110)");
-  });
-
   it("When 6 bullets, title font size should be smaller than 2-bullet airy slide", () => {
     const airy = {
       id: "a",
@@ -65,5 +49,45 @@ describe("SlidePreview", () => {
     const airySize = Number(airyTitle?.style.fontSize.replace("px", ""));
     const compactSize = Number(compactTitle?.style.fontSize.replace("px", ""));
     expect(compactSize).toBeLessThan(airySize);
+  });
+
+  it("When branding is on bullets slide, should show accent bar", () => {
+    const slide = {
+      id: "b",
+      order: 0,
+      type: "content" as const,
+      layout: "bullets" as const,
+      title: "Branded",
+      content: { bullets: ["One"] },
+    };
+    const { container } = render(
+      <SlidePreview
+        slide={slide}
+        applyBranding
+        brandTheme={{
+          primaryColor: "#0F766E",
+          accentColor: "#C55221",
+          fontStyle: "sans",
+        }}
+      />
+    );
+    const accentBars = container.querySelectorAll('[aria-hidden="true"]');
+    expect(accentBars.length).toBeGreaterThan(0);
+  });
+
+  it("When branding is on title slide, should apply primary color to title", () => {
+    render(
+      <SlidePreview
+        slide={sampleSlide}
+        applyBranding
+        brandTheme={{
+          primaryColor: "#0F766E",
+          accentColor: "#C55221",
+          fontStyle: "sans",
+        }}
+      />
+    );
+    const title = screen.getByRole("heading", { level: 2 });
+    expect(title.getAttribute("style")).toContain("color: rgb(15, 118, 110)");
   });
 });

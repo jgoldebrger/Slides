@@ -3,6 +3,7 @@ import {
   buildLayoutComposition,
   countContentSignals,
   inToPx,
+  inToPy,
   pickDensity,
   ptToPx,
 } from "@/lib/slides/layout-spec";
@@ -93,6 +94,10 @@ describe("unit converters", () => {
 
   it("When converting 12pt, should equal 16px", () => {
     expect(ptToPx(12)).toBe(16);
+  });
+
+  it("When converting slide height inches, should scale to canvas height", () => {
+    expect(inToPy(5.625)).toBeCloseTo(540, 1);
   });
 });
 

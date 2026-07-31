@@ -1,4 +1,5 @@
 import type { Slide, SlideLayout } from "@/types/slide";
+import { SLIDE_LAYOUTS } from "@/types/slide";
 import { richTextToPlainText } from "@/lib/slides/rich-text";
 
 export type LayoutDensity = "compact" | "comfort" | "airy";
@@ -151,10 +152,41 @@ export function ptToPx(pt: number): number {
   return pt * (96 / 72);
 }
 
+export function previewCanvasHeightPx(): number {
+  return PREVIEW_REF_WIDTH_PX * (PPTX_SLIDE_HEIGHT_IN / PPTX_SLIDE_WIDTH_IN);
+}
+
+export function inToPy(inches: number): number {
+  return (inches / PPTX_SLIDE_HEIGHT_IN) * previewCanvasHeightPx();
+}
+
+export function isExtremeVolume(
+  signals: ContentSignals,
+  layout: SlideLayout
+): boolean {
+  if (signals.bulletCount > 8) return true;
+  if (signals.metricCount > 6) return true;
+  if (signals.timelineCount > 10) return true;
+  if (layout === "chart" && signals.chartPointCount > 10) return true;
+  return false;
+}
+
+function normalizeSlideLayout(layout: string): SlideLayout {
+  if ((SLIDE_LAYOUTS as readonly string[]).includes(layout)) {
+    return layout as SlideLayout;
+  }
+  if (process.env.NODE_ENV === "development") {
+    console.warn(
+      `[layout-spec] Unknown slide layout "${layout}", falling back to bullets`
+    );
+  }
+  return "bullets";
+}
+
 export function buildLayoutComposition(
   layout: SlideLayout,
   density: LayoutDensity,
-  options?: { branded?: boolean }
+  options?: { branded?: boolean; extremeVolume?: boolean }
 ): LayoutComposition {
   const branded = options?.branded ?? false;
   const paddingIn = PPTX_SLIDE_HEIGHT_IN * PADDING_RATIO[density];
@@ -187,9 +219,18 @@ export function buildLayoutComposition(
     imageTextWidthIn,
     imageWidthIn,
     timelineGapIn,
-    contentOverflow: density === "compact" ? "auto" : "visible",
+    contentOverflow:
+      density === "compact" && options?.extremeVolume ? "auto" : "visible",
   };
 }
+
+/** PPTX branded accent bar geometry (inches). */
+export const BRANDED_ACCENT_BAR = {
+  xIn: 0.5,
+  yIn: 0.35,
+  widthIn: 1.2,
+  heightIn: 0.06,
+} as const;
 
 const TITLE_CLASS: Record<LayoutDensity, string> = {
   airy: "font-bold tracking-tight",
@@ -198,7 +239,16 @@ const TITLE_CLASS: Record<LayoutDensity, string> = {
 };
 
 export type PreviewCompositionStyles = {
-  paddingPx: number;
+  paddingXPx: number;
+  paddingBottomPx: number;
+  titleTopPx: number;
+  titleHeightPx: number;
+  contentTopPx: number;
+  contentHeightPx: number;
+  accentBarTopPx: number;
+  accentBarLeftPx: number;
+  accentBarWidthPx: number;
+  accentBarHeightPx: number;
   titleClass: string;
   titleStyle: { fontSize: string };
   bodyClass: string;
@@ -206,7 +256,6 @@ export type PreviewCompositionStyles = {
   bulletClass: string;
   bulletStyle: { fontSize: string };
   contentClass: string;
-  titleMarginBottomPx: number;
   contentGapPx: number;
 };
 
@@ -215,21 +264,19 @@ export function resolveLayoutComposition(
   options?: { branded?: boolean }
 ): LayoutComposition {
   const signals = countContentSignals(slide);
-  const density = pickDensity(slide.layout, signals);
-  return buildLayoutComposition(slide.layout, density, options);
+  const layout = normalizeSlideLayout(slide.layout);
+  const density = pickDensity(layout, signals);
+  return buildLayoutComposition(layout, density, {
+    branded: options?.branded,
+    extremeVolume: isExtremeVolume(signals, layout),
+  });
 }
 
 export function compositionToPreviewStyles(
   composition: LayoutComposition
 ): PreviewCompositionStyles {
-  const paddingPx = inToPx(composition.paddingIn);
   const bodySizePx = ptToPx(composition.typography.bodyPt);
   const bulletSizePx = ptToPx(composition.typography.bulletPt);
-  const titleMarginBottomPx = inToPx(
-    composition.contentYIn -
-      composition.titleYIn -
-      composition.titleHeightIn
-  );
 
   const bulletSpacing =
     composition.density === "airy"
@@ -239,7 +286,16 @@ export function compositionToPreviewStyles(
         : "space-y-1";
 
   return {
-    paddingPx,
+    paddingXPx: inToPx(composition.paddingIn),
+    paddingBottomPx: inToPy(composition.paddingIn),
+    titleTopPx: inToPy(composition.titleYIn),
+    titleHeightPx: inToPy(composition.titleHeightIn),
+    contentTopPx: inToPy(composition.contentYIn),
+    contentHeightPx: inToPy(composition.contentHeightIn),
+    accentBarTopPx: inToPy(BRANDED_ACCENT_BAR.yIn),
+    accentBarLeftPx: inToPx(BRANDED_ACCENT_BAR.xIn),
+    accentBarWidthPx: inToPx(BRANDED_ACCENT_BAR.widthIn),
+    accentBarHeightPx: inToPy(BRANDED_ACCENT_BAR.heightIn),
     titleClass: TITLE_CLASS[composition.density],
     titleStyle: { fontSize: `${ptToPx(composition.typography.titlePt)}px` },
     bodyClass: composition.density === "compact" ? "" : "leading-relaxed",
@@ -248,7 +304,6 @@ export function compositionToPreviewStyles(
     bulletStyle: { fontSize: `${bulletSizePx}px` },
     contentClass:
       composition.contentOverflow === "auto" ? "min-h-0 overflow-auto" : "",
-    titleMarginBottomPx,
-    contentGapPx: inToPx(composition.contentGapIn),
+    contentGapPx: inToPy(composition.contentGapIn),
   };
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { generatePptxBuffer } from "@/lib/export/pptx";
+import { resolveLayoutComposition } from "@/lib/slides/layout-spec";
 import type { Slide } from "@/types/slide";
 
 describe("generatePptxBuffer", () => {
@@ -57,5 +58,22 @@ describe("generatePptxBuffer", () => {
       fontStyle: "sans",
     });
     expect(buffer.subarray(0, 2).toString()).toBe("PK");
+  });
+
+  it("When compact bullets slide, composition should drive bullet typography", () => {
+    const slide: Slide = {
+      id: "1",
+      order: 0,
+      type: "content",
+      layout: "bullets",
+      title: "Updates",
+      content: {
+        bullets: ["a", "b", "c", "d", "e", "f"],
+      },
+    };
+    const comp = resolveLayoutComposition(slide);
+    expect(comp.density).toBe("compact");
+    expect(comp.typography.bulletPt).toBe(13);
+    expect(comp.contentYIn).toBeCloseTo(1.35, 2);
   });
 });
