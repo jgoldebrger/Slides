@@ -9,6 +9,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { isAiFeatureEnabled } from "@/lib/ai/feature-flags";
+import { loadOrgAiPrefs } from "@/lib/ai/org-prefs";
 import { loadDeckBrandPreview } from "@/lib/brand/load-deck-brand";
 import { hashShareToken } from "@/lib/share/token";
 import { mapDbSlide } from "@/lib/slides/map-db-slide";
@@ -163,6 +165,11 @@ export default async function SharedDeckViewPage({
     deck.org_id,
     deck.apply_branding ?? true
   );
+  const aiPrefs = await loadOrgAiPrefs(supabase, deck.org_id);
+  const aiPlayerEnabled = isAiFeatureEnabled(
+    "present_ai_player",
+    aiPrefs.featureOverrides ?? null
+  );
 
   return (
     <>
@@ -185,6 +192,7 @@ export default async function SharedDeckViewPage({
           viewerMode
           shareMode
           shareToken={token}
+          aiPlayerEnabled={aiPlayerEnabled}
           applyBranding={applyBranding}
           brandTheme={brandTheme}
         />

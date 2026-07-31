@@ -31,6 +31,7 @@ import { parseSlideAnimation } from "@/lib/slides/animations";
 import type { Slide } from "@/types/slide";
 import { Button } from "@/components/ui/button";
 import { AiPresentPanel } from "@/components/decks/ai-present-panel";
+import { AiDeckPlayerControls } from "@/components/decks/ai-deck-player-controls";
 import { cn } from "@/lib/utils";
 
 const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 2] as const;
@@ -81,6 +82,7 @@ type SlidePlayerProps = {
   shareMode?: boolean;
   /** Required for AI narration on public share links */
   shareToken?: string | null;
+  aiPlayerEnabled?: boolean;
   applyBranding?: boolean;
   brandTheme?: BrandPreviewTheme | null;
 };
@@ -94,6 +96,7 @@ export function SlidePlayer({
   viewerMode = false,
   shareMode = false,
   shareToken = null,
+  aiPlayerEnabled = false,
   applyBranding = false,
   brandTheme = null,
 }: SlidePlayerProps) {
@@ -920,6 +923,22 @@ export function SlidePlayer({
           </div>
         </div>
       </div>
+
+      {!isFullscreen && shareMode && aiPlayerEnabled && shareToken ? (
+        <AiDeckPlayerControls
+          deckId={deckId}
+          slides={sorted}
+          shareToken={shareToken}
+          voice={narrationVoice}
+          speed={playbackSpeed}
+          currentIndex={index}
+          onIndexChange={(nextIndex) => {
+            setPlaying(false);
+            goTo(nextIndex);
+          }}
+          enabled
+        />
+      ) : null}
 
       {!isFullscreen && current && narrationEnabled && (
         <div
