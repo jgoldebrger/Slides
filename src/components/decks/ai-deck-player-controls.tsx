@@ -318,6 +318,7 @@ export function AiDeckPlayerControls({
 
   return (
     <section
+      data-testid="ai-deck-player"
       className="rounded-lg border border-link/20 bg-[var(--color-brand-50)] p-4"
       aria-label="AI presenter controls"
     >
