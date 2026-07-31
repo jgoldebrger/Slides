@@ -2,15 +2,22 @@ import { stripHex } from "./types";
 import type { PptxLayoutMapper } from "./types";
 import { normalizeChartData } from "@/lib/slides/metrics-to-chart";
 import { richTextToPlainText } from "@/lib/slides/rich-text";
+import { PPTX_SLIDE_WIDTH_IN } from "@/lib/slides/layout-spec";
 
-export const mapTitleLayout: PptxLayoutMapper = ({ pptxSlide, slide, font, colors }) => {
+export const mapTitleLayout: PptxLayoutMapper = ({
+  pptxSlide,
+  slide,
+  font,
+  colors,
+  composition,
+}) => {
   if (slide.content.body) {
     pptxSlide.addText(richTextToPlainText(slide.content.body), {
-      x: 0.5,
-      y: 1.5,
-      w: 9,
-      h: 0.8,
-      fontSize: 16,
+      x: composition.paddingIn,
+      y: composition.contentYIn,
+      w: PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2,
+      h: composition.contentHeightIn,
+      fontSize: composition.typography.bodyPt,
       fontFace: font,
       color: stripHex(colors.muted),
     });
@@ -22,45 +29,51 @@ export const mapBulletsLayout: PptxLayoutMapper = ({
   slide,
   font,
   colors,
-  contentY,
+  composition,
 }) => {
   const bullets = slide.content.bullets ?? [];
   const hasImage = Boolean(slide.content.imageUrl);
-  const textW = hasImage ? 4.3 : 9;
+  const slideWidth = PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2;
+  const textW = hasImage ? composition.imageTextWidthIn : slideWidth;
   const textOpts = {
-    fontSize: 16,
+    fontSize: composition.typography.bulletPt,
     fontFace: font,
     color: stripHex(colors.muted),
   };
+  const x = composition.paddingIn;
+  const y = composition.contentYIn;
+  const h = composition.contentHeightIn;
 
   if (bullets.length) {
     pptxSlide.addText(
       bullets.map((b) => ({ text: richTextToPlainText(b), options: { bullet: true } })),
       {
-        x: 0.5,
-        y: contentY,
+        x,
+        y,
         w: textW,
-        h: 4,
+        h,
         ...textOpts,
       }
     );
   } else if (slide.content.body) {
-    pptxSlide.addText(slide.content.body, {
-      x: 0.5,
-      y: contentY,
+    pptxSlide.addText(richTextToPlainText(slide.content.body), {
+      x,
+      y,
       w: textW,
-      h: 4,
-      ...textOpts,
+      h,
+      fontSize: composition.typography.bodyPt,
+      fontFace: font,
+      color: stripHex(colors.muted),
     });
   }
 
   if (hasImage && slide.content.imageUrl) {
     pptxSlide.addImage({
       path: slide.content.imageUrl,
-      x: 5.1,
-      y: contentY,
-      w: 4.4,
-      h: 3.8,
+      x: composition.paddingIn + composition.imageTextWidthIn + 0.2,
+      y,
+      w: composition.imageWidthIn,
+      h: Math.min(h, 3.8),
     });
   }
 };
@@ -70,17 +83,23 @@ export const mapMetricsGridLayout: PptxLayoutMapper = ({
   slide,
   font,
   colors,
-  contentY,
+  composition,
 }) => {
-  slide.content.metrics?.forEach((m, i) => {
-    const col = i % 3;
-    const row = Math.floor(i / 3);
+  const metrics = slide.content.metrics ?? [];
+  const cols = composition.metricsCols;
+  const usableW = PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2;
+  const colW = usableW / cols - 0.15;
+  const rowH = composition.contentGapIn + 1.0;
+
+  metrics.forEach((m, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
     pptxSlide.addText(`${m.value}\n${m.label}`, {
-      x: 0.5 + col * 3.1,
-      y: contentY + 0.3 + row * 1.5,
-      w: 2.8,
-      h: 1.2,
-      fontSize: 18,
+      x: composition.paddingIn + col * (colW + 0.15),
+      y: composition.contentYIn + row * rowH,
+      w: colW,
+      h: rowH,
+      fontSize: composition.typography.metricValuePt,
       color: stripHex(colors.accent),
       fontFace: font,
     });
@@ -92,23 +111,24 @@ export const mapTimelineLayout: PptxLayoutMapper = ({
   slide,
   font,
   colors,
-  contentY,
+  composition,
 }) => {
+  const gap = composition.timelineGapIn;
   (slide.content.bullets ?? []).forEach((item, i) => {
     pptxSlide.addShape("ellipse", {
-      x: 0.55,
-      y: contentY + 0.15 + i * 0.55,
+      x: composition.paddingIn + 0.05,
+      y: composition.contentYIn + 0.15 + i * gap,
       w: 0.12,
       h: 0.12,
       fill: { color: stripHex(colors.primary) },
       line: { color: stripHex(colors.primary), width: 0 },
     });
-    pptxSlide.addText(item, {
-      x: 0.85,
-      y: contentY + i * 0.55,
-      w: 8.5,
-      h: 0.45,
-      fontSize: 14,
+    pptxSlide.addText(richTextToPlainText(item), {
+      x: composition.paddingIn + 0.35,
+      y: composition.contentYIn + i * gap,
+      w: PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2 - 0.35,
+      h: gap,
+      fontSize: composition.typography.bulletPt,
       fontFace: font,
       color: stripHex(colors.muted),
     });
@@ -120,56 +140,63 @@ export const mapTwoColumnLayout: PptxLayoutMapper = ({
   slide,
   font,
   colors,
-  contentY,
+  composition,
 }) => {
   const bullets = slide.content.bullets ?? [];
   const mid = Math.ceil(bullets.length / 2);
   const left = bullets.slice(0, mid);
   const right = bullets.slice(mid);
+  const colW = (PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2 - 0.2) / 2;
+  const x = composition.paddingIn;
+  const y = composition.contentYIn;
+  const h = composition.contentHeightIn;
+  const textOpts = {
+    fontSize: composition.typography.bulletPt,
+    fontFace: font,
+    color: stripHex(colors.muted),
+  };
 
   if (slide.content.imageUrl) {
     const leftBullets = left.length ? left : bullets;
     if (leftBullets.length) {
       pptxSlide.addText(
-        leftBullets.map((b) => ({ text: b, options: { bullet: true } })),
+        leftBullets.map((b) => ({ text: richTextToPlainText(b), options: { bullet: true } })),
         {
-          x: 0.5,
-          y: contentY,
-          w: 4.2,
-          h: 4,
-          fontSize: 14,
-          fontFace: font,
-          color: stripHex(colors.muted),
+          x,
+          y,
+          w: colW,
+          h,
+          ...textOpts,
         }
       );
     }
     if (slide.content.body) {
-      pptxSlide.addText(slide.content.body, {
-        x: 0.5,
-        y: contentY + 2.2,
-        w: 4.2,
-        h: 1.5,
-        fontSize: 13,
+      pptxSlide.addText(richTextToPlainText(slide.content.body), {
+        x,
+        y: y + h * 0.55,
+        w: colW,
+        h: h * 0.4,
+        fontSize: composition.typography.bodyPt,
         fontFace: font,
         color: stripHex(colors.muted),
       });
     }
     pptxSlide.addImage({
       path: slide.content.imageUrl,
-      x: 5.1,
-      y: contentY,
-      w: 4.4,
-      h: 3.8,
+      x: composition.paddingIn + colW + 0.2,
+      y,
+      w: composition.imageWidthIn,
+      h: Math.min(h, 3.8),
     });
     if (right.length) {
       pptxSlide.addText(
-        right.map((b) => ({ text: b, options: { bullet: true } })),
+        right.map((b) => ({ text: richTextToPlainText(b), options: { bullet: true } })),
         {
-          x: 5.1,
-          y: contentY + 3.9,
-          w: 4.4,
+          x: composition.paddingIn + colW + 0.2,
+          y: y + 3.9,
+          w: composition.imageWidthIn,
           h: 1.2,
-          fontSize: 12,
+          fontSize: composition.typography.bulletPt,
           fontFace: font,
           color: stripHex(colors.muted),
         }
@@ -180,39 +207,29 @@ export const mapTwoColumnLayout: PptxLayoutMapper = ({
 
   if (left.length) {
     pptxSlide.addText(
-      left.map((b) => ({ text: b, options: { bullet: true } })),
-      {
-        x: 0.5,
-        y: contentY,
-        w: 4.2,
-        h: 4,
-        fontSize: 14,
-        fontFace: font,
-        color: stripHex(colors.muted),
-      }
+      left.map((b) => ({ text: richTextToPlainText(b), options: { bullet: true } })),
+      { x, y, w: colW, h, ...textOpts }
     );
   }
   if (right.length) {
     pptxSlide.addText(
-      right.map((b) => ({ text: b, options: { bullet: true } })),
+      right.map((b) => ({ text: richTextToPlainText(b), options: { bullet: true } })),
       {
-        x: 5.2,
-        y: contentY,
-        w: 4.2,
-        h: 4,
-        fontSize: 14,
-        fontFace: font,
-        color: stripHex(colors.muted),
+        x: composition.paddingIn + colW + 0.2,
+        y,
+        w: colW,
+        h,
+        ...textOpts,
       }
     );
   }
   if (slide.content.body) {
     pptxSlide.addText(richTextToPlainText(slide.content.body), {
-      x: 5.2,
-      y: contentY + 2.2,
-      w: 4.2,
-      h: 1.5,
-      fontSize: 13,
+      x: composition.paddingIn + colW + 0.2,
+      y: y + h * 0.55,
+      w: colW,
+      h: h * 0.4,
+      fontSize: composition.typography.bodyPt,
       fontFace: font,
       color: stripHex(colors.muted),
     });
@@ -224,30 +241,33 @@ export const mapImageCaptionLayout: PptxLayoutMapper = ({
   slide,
   font,
   colors,
-  contentY,
+  composition,
 }) => {
   const bullets = slide.content.bullets ?? [];
+  const x = composition.paddingIn;
+  const y = composition.contentYIn;
+  const textH = Math.min(composition.contentHeightIn, 3.8);
 
   if (bullets.length) {
     pptxSlide.addText(
       bullets.map((b) => ({ text: richTextToPlainText(b), options: { bullet: true } })),
       {
-        x: 0.5,
-        y: contentY,
-        w: 4.3,
-        h: 3.8,
-        fontSize: 14,
+        x,
+        y,
+        w: composition.imageTextWidthIn,
+        h: textH,
+        fontSize: composition.typography.bulletPt,
         fontFace: font,
         color: stripHex(colors.muted),
       }
     );
   } else if (slide.content.body) {
-    pptxSlide.addText(slide.content.body, {
-      x: 0.5,
-      y: contentY,
-      w: 4.3,
-      h: 3.8,
-      fontSize: 14,
+    pptxSlide.addText(richTextToPlainText(slide.content.body), {
+      x,
+      y,
+      w: composition.imageTextWidthIn,
+      h: textH,
+      fontSize: composition.typography.bodyPt,
       fontFace: font,
       color: stripHex(colors.muted),
     });
@@ -256,10 +276,10 @@ export const mapImageCaptionLayout: PptxLayoutMapper = ({
   if (slide.content.imageUrl) {
     pptxSlide.addImage({
       path: slide.content.imageUrl,
-      x: 5.1,
-      y: contentY,
-      w: 4.4,
-      h: 3.8,
+      x: composition.paddingIn + composition.imageTextWidthIn + 0.2,
+      y,
+      w: composition.imageWidthIn,
+      h: textH,
     });
   }
 };
@@ -269,19 +289,21 @@ export const mapChartLayout: PptxLayoutMapper = ({
   slide,
   font,
   colors,
-  contentY,
+  composition,
 }) => {
   const data = normalizeChartData(slide.content.chartData);
   const maxValue = Math.max(...data.map((d) => d.value), 1);
+  const chartHeight = Math.min(composition.contentHeightIn * 0.55, 2.8);
+  const baseY = composition.contentYIn + chartHeight;
 
   data.forEach((point, i) => {
-    const barHeight = Math.max(0.2, (point.value / maxValue) * 2.5);
+    const barHeight = Math.max(0.2, (point.value / maxValue) * chartHeight);
     const label = point.name;
-    const x = 1 + i * 1.1;
+    const x = composition.paddingIn + 0.5 + i * 1.1;
 
     pptxSlide.addShape("rect", {
       x,
-      y: contentY + 2.8 - barHeight,
+      y: baseY - barHeight,
       w: 0.7,
       h: barHeight,
       fill: { color: stripHex(colors.primary) },
@@ -289,10 +311,10 @@ export const mapChartLayout: PptxLayoutMapper = ({
     });
     pptxSlide.addText(label, {
       x: x - 0.1,
-      y: contentY + 2.95,
+      y: baseY + 0.05,
       w: 0.9,
       h: 0.3,
-      fontSize: 10,
+      fontSize: composition.typography.captionPt,
       align: "center",
       fontFace: font,
       color: stripHex(colors.muted),
@@ -301,11 +323,11 @@ export const mapChartLayout: PptxLayoutMapper = ({
 
   if (slide.content.body) {
     pptxSlide.addText(richTextToPlainText(slide.content.body), {
-      x: 0.5,
-      y: contentY + 3.4,
-      w: 9,
+      x: composition.paddingIn,
+      y: baseY + 0.45,
+      w: PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2,
       h: 0.5,
-      fontSize: 12,
+      fontSize: composition.typography.bodyPt,
       fontFace: font,
       color: stripHex(colors.muted),
     });
@@ -317,14 +339,17 @@ export const mapQuoteLayout: PptxLayoutMapper = ({
   slide,
   font,
   colors,
+  composition,
 }) => {
+  const x = composition.paddingIn + 0.5;
+  const w = PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2 - 1;
   if (slide.content.quote) {
     pptxSlide.addText(`"${richTextToPlainText(slide.content.quote)}"`, {
-      x: 1,
-      y: 2,
-      w: 8,
-      h: 2,
-      fontSize: 22,
+      x,
+      y: composition.contentYIn,
+      w,
+      h: composition.contentHeightIn * 0.6,
+      fontSize: composition.typography.titlePt,
       italic: true,
       fontFace: font,
       color: stripHex(colors.muted),
@@ -332,11 +357,11 @@ export const mapQuoteLayout: PptxLayoutMapper = ({
   }
   if (slide.content.attribution) {
     pptxSlide.addText(`— ${slide.content.attribution}`, {
-      x: 1,
-      y: 4.2,
-      w: 8,
+      x,
+      y: composition.contentYIn + composition.contentHeightIn * 0.65,
+      w,
       h: 0.5,
-      fontSize: 14,
+      fontSize: composition.typography.captionPt,
       fontFace: font,
       color: stripHex(colors.muted),
     });
@@ -348,23 +373,23 @@ export const mapSectionBreakLayout: PptxLayoutMapper = ({
   slide,
   font,
   colors,
-  contentY,
+  composition,
 }) => {
   pptxSlide.addShape("rect", {
-    x: 0.5,
-    y: contentY,
+    x: composition.paddingIn,
+    y: composition.contentYIn,
     w: 0.08,
-    h: 2.5,
+    h: Math.min(composition.contentHeightIn, 2.5),
     fill: { color: stripHex(colors.primary) },
     line: { color: stripHex(colors.primary), width: 0 },
   });
   if (slide.content.body) {
     pptxSlide.addText(richTextToPlainText(slide.content.body), {
-      x: 0.85,
-      y: contentY + 0.5,
-      w: 8.5,
+      x: composition.paddingIn + 0.35,
+      y: composition.contentYIn + 0.5,
+      w: PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2 - 0.35,
       h: 1.5,
-      fontSize: 16,
+      fontSize: composition.typography.bodyPt,
       fontFace: font,
       color: stripHex(colors.muted),
     });

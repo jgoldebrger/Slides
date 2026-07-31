@@ -7,6 +7,10 @@ import {
   type SlideColors,
 } from "@/lib/slides/layout-theme";
 import { PPTX_LAYOUT_MAPPERS } from "@/lib/export/layouts/registry";
+import {
+  PPTX_SLIDE_WIDTH_IN,
+  resolveLayoutComposition,
+} from "@/lib/slides/layout-spec";
 import type { Slide, SlideLayout } from "@/types/slide";
 import { richTextToPlainText } from "@/lib/slides/rich-text";
 
@@ -99,18 +103,19 @@ function addSlideContent(
     addBrandedAccentBar(pptxSlide, colors);
   }
 
+  const composition = resolveLayoutComposition(slide, { branded });
+
   pptxSlide.addText(richTextToPlainText(slide.title), {
-    x: 0.5,
-    y: branded ? 0.55 : 0.4,
-    w: 9,
-    h: 1,
-    fontSize: 28,
+    x: composition.paddingIn,
+    y: composition.titleYIn,
+    w: PPTX_SLIDE_WIDTH_IN - composition.paddingIn * 2,
+    h: composition.titleHeightIn,
+    fontSize: composition.typography.titlePt,
     bold: true,
     color: stripHexHash(colors.primary),
     fontFace: font,
   });
 
-  const contentY = branded ? 1.65 : 1.5;
   const mapper = PPTX_LAYOUT_MAPPERS[slide.layout as SlideLayout];
   mapper({
     pptxSlide,
@@ -118,7 +123,7 @@ function addSlideContent(
     theme,
     colors,
     font,
-    contentY,
+    composition,
     branded,
   });
 

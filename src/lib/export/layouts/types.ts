@@ -1,5 +1,6 @@
 import type PptxGenJS from "pptxgenjs";
 import type { BrandTheme } from "@/lib/brand";
+import type { LayoutComposition } from "@/lib/slides/layout-spec";
 import type { SlideColors } from "@/lib/slides/layout-theme";
 import type { Slide } from "@/types/slide";
 
@@ -9,7 +10,7 @@ export type PptxLayoutContext = {
   theme: BrandTheme;
   colors: SlideColors;
   font: string;
-  contentY: number;
+  composition: LayoutComposition;
   branded: boolean;
 };
 
