@@ -36,4 +36,34 @@ describe("SlidePreview", () => {
     const title = screen.getByRole("heading", { level: 2 });
     expect(title.getAttribute("style")).toContain("color: rgb(15, 118, 110)");
   });
+
+  it("When 6 bullets, title font size should be smaller than 2-bullet airy slide", () => {
+    const airy = {
+      id: "a",
+      order: 0,
+      type: "content" as const,
+      layout: "bullets" as const,
+      title: "Few",
+      content: { bullets: ["One", "Two"] },
+    };
+    const compact = {
+      id: "b",
+      order: 1,
+      type: "content" as const,
+      layout: "bullets" as const,
+      title: "Many",
+      content: {
+        bullets: ["1", "2", "3", "4", "5", "6"],
+      },
+    };
+
+    const { container: airyContainer } = render(<SlidePreview slide={airy} />);
+    const { container: compactContainer } = render(<SlidePreview slide={compact} />);
+
+    const airyTitle = airyContainer.querySelector("h2");
+    const compactTitle = compactContainer.querySelector("h2");
+    const airySize = Number(airyTitle?.style.fontSize.replace("px", ""));
+    const compactSize = Number(compactTitle?.style.fontSize.replace("px", ""));
+    expect(compactSize).toBeLessThan(airySize);
+  });
 });
