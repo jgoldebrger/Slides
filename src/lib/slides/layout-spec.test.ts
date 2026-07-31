@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildLayoutComposition,
   countContentSignals,
+  inToPx,
   pickDensity,
+  ptToPx,
 } from "@/lib/slides/layout-spec";
 import type { Slide } from "@/types/slide";
 
@@ -56,6 +59,40 @@ describe("pickDensity", () => {
       content: {},
     });
     expect(pickDensity("section_break", signals)).toBe("airy");
+  });
+});
+
+describe("buildLayoutComposition", () => {
+  it("When airy bullets and branded, contentY should be greater than unbranded", () => {
+    const branded = buildLayoutComposition("bullets", "airy", { branded: true });
+    const neutral = buildLayoutComposition("bullets", "airy", { branded: false });
+    expect(branded.contentYIn).toBeGreaterThan(neutral.contentYIn);
+  });
+
+  it("When compact density, body font should be smaller than airy", () => {
+    const compact = buildLayoutComposition("bullets", "compact");
+    const airy = buildLayoutComposition("bullets", "airy");
+    expect(compact.typography.bodyPt).toBeLessThan(airy.typography.bodyPt);
+  });
+
+  it("When airy metrics_grid, should use 2 columns", () => {
+    const comp = buildLayoutComposition("metrics_grid", "airy");
+    expect(comp.metricsCols).toBe(2);
+  });
+
+  it("When compact metrics_grid, should use 3 columns", () => {
+    const comp = buildLayoutComposition("metrics_grid", "compact");
+    expect(comp.metricsCols).toBe(3);
+  });
+});
+
+describe("unit converters", () => {
+  it("When converting 1 inch at reference width, should equal 96px", () => {
+    expect(inToPx(1)).toBe(96);
+  });
+
+  it("When converting 12pt, should equal 16px", () => {
+    expect(ptToPx(12)).toBe(16);
   });
 });
 

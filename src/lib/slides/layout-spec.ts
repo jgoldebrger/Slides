@@ -78,3 +78,115 @@ export function pickDensity(
     ? "compact"
     : bulletDensity;
 }
+
+export const PPTX_SLIDE_WIDTH_IN = 10;
+export const PPTX_SLIDE_HEIGHT_IN = 5.625;
+export const PREVIEW_REF_WIDTH_PX = 960;
+
+const TYPOGRAPHY: Record<LayoutDensity, LayoutTypography> = {
+  airy: {
+    titlePt: 32,
+    bodyPt: 18,
+    bulletPt: 16,
+    metricValuePt: 28,
+    metricLabelPt: 12,
+    captionPt: 14,
+  },
+  comfort: {
+    titlePt: 28,
+    bodyPt: 16,
+    bulletPt: 15,
+    metricValuePt: 24,
+    metricLabelPt: 11,
+    captionPt: 13,
+  },
+  compact: {
+    titlePt: 24,
+    bodyPt: 14,
+    bulletPt: 13,
+    metricValuePt: 20,
+    metricLabelPt: 10,
+    captionPt: 12,
+  },
+};
+
+const PADDING_RATIO: Record<LayoutDensity, number> = {
+  airy: 0.08,
+  comfort: 0.07,
+  compact: 0.06,
+};
+
+export type LayoutTypography = {
+  titlePt: number;
+  bodyPt: number;
+  bulletPt: number;
+  metricValuePt: number;
+  metricLabelPt: number;
+  captionPt: number;
+};
+
+export type LayoutComposition = {
+  layout: SlideLayout;
+  density: LayoutDensity;
+  branded: boolean;
+  paddingIn: number;
+  titleYIn: number;
+  titleHeightIn: number;
+  contentYIn: number;
+  contentHeightIn: number;
+  contentGapIn: number;
+  typography: LayoutTypography;
+  metricsCols: 2 | 3;
+  imageTextWidthIn: number;
+  imageWidthIn: number;
+  timelineGapIn: number;
+  contentOverflow: "auto" | "visible";
+};
+
+export function inToPx(inches: number): number {
+  return (inches / PPTX_SLIDE_WIDTH_IN) * PREVIEW_REF_WIDTH_PX;
+}
+
+export function ptToPx(pt: number): number {
+  return pt * (96 / 72);
+}
+
+export function buildLayoutComposition(
+  layout: SlideLayout,
+  density: LayoutDensity,
+  options?: { branded?: boolean }
+): LayoutComposition {
+  const branded = options?.branded ?? false;
+  const paddingIn = PPTX_SLIDE_HEIGHT_IN * PADDING_RATIO[density];
+  const titleYIn = branded ? 0.55 : 0.4;
+  const titleHeightIn =
+    density === "airy" ? 1.0 : density === "comfort" ? 0.9 : 0.8;
+  const contentYIn =
+    titleYIn + titleHeightIn + (density === "airy" ? 0.25 : 0.15);
+  const contentHeightIn = PPTX_SLIDE_HEIGHT_IN - contentYIn - paddingIn;
+  const contentGapIn =
+    density === "airy" ? 0.35 : density === "comfort" ? 0.28 : 0.22;
+  const imageTextWidthIn = density === "compact" ? 4.2 : 4.3;
+  const imageWidthIn = 4.4;
+  const metricsCols = density === "compact" ? 3 : 2;
+  const timelineGapIn =
+    density === "airy" ? 0.6 : density === "comfort" ? 0.5 : 0.45;
+
+  return {
+    layout,
+    density,
+    branded,
+    paddingIn,
+    titleYIn,
+    titleHeightIn,
+    contentYIn,
+    contentHeightIn,
+    contentGapIn,
+    typography: TYPOGRAPHY[density],
+    metricsCols,
+    imageTextWidthIn,
+    imageWidthIn,
+    timelineGapIn,
+    contentOverflow: density === "compact" ? "auto" : "visible",
+  };
+}
