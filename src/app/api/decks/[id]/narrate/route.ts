@@ -7,11 +7,10 @@ import { apiError, handleApiError } from "@/lib/api/response";
 import { assertOrgCanUsePaidFeatures } from "@/lib/billing/entitlements";
 import { PublicError } from "@/lib/errors/public-error";
 import { assertRateLimit } from "@/lib/rate-limit";
+import { authorizeDeckAccess } from "@/lib/share/authorize-deck-access";
 import { buildSlideNarration } from "@/lib/slides/narration";
 import { mapDbSlide } from "@/lib/slides/map-db-slide";
-import { hashShareToken } from "@/lib/share/token";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 
 const bodySchema = z.object({
   slideId: z.string().uuid(),
@@ -19,63 +18,6 @@ const bodySchema = z.object({
   speed: z.number().min(0.25).max(4).optional(),
   shareToken: z.string().min(16).max(200).optional(),
 });
-
-async function authorizeDeckAccess(
-  deckId: string,
-  shareToken?: string
-): Promise<{ orgId: string }> {
-  if (shareToken) {
-    const tokenHash = hashShareToken(shareToken);
-    const admin = createAdminClient();
-    const { data: link } = await admin
-      .from("deck_share_links")
-      .select("deck_id, expires_at, revoked_at")
-      .eq("token_hash", tokenHash)
-      .maybeSingle();
-
-    if (
-      !link ||
-      link.revoked_at ||
-      link.deck_id !== deckId ||
-      (link.expires_at && new Date(link.expires_at) <= new Date())
-    ) {
-      throw Object.assign(new Error("Share link unavailable"), {
-        status: 403,
-      });
-    }
-
-    const { data: deck } = await admin
-      .from("decks")
-      .select("org_id")
-      .eq("id", deckId)
-      .single();
-
-    if (!deck) {
-      throw Object.assign(new Error("Deck not found"), { status: 404 });
-    }
-    return { orgId: deck.org_id };
-  }
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    throw Object.assign(new Error("Authentication required"), { status: 401 });
-  }
-
-  const { data: deck } = await supabase
-    .from("decks")
-    .select("org_id")
-    .eq("id", deckId)
-    .maybeSingle();
-
-  if (!deck) {
-    throw Object.assign(new Error("Deck not found"), { status: 404 });
-  }
-
-  return { orgId: deck.org_id };
-}
 
 export async function POST(
   request: Request,
