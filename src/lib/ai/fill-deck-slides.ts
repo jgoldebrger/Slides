@@ -10,6 +10,10 @@ import { contentFocusFromMetadata } from "@/lib/ai/load-deck-content-focus";
 import { analyzeProjectUpdates } from "@/lib/ai/analyze-project-updates";
 import { prepareProjectUpdatesForDeck } from "@/lib/ai/project-updates-context";
 import { buildSlideFillPrompt } from "@/lib/ai/prompts/slides";
+import { buildSlideContentPlan } from "@/lib/ai/slide-content-plan";
+import { speakerNotesRepeatBullets } from "@/lib/ai/speaker-notes";
+import { summarizeSlideContent } from "@/lib/ai/slide-summary";
+import { extractUpdateFacts, factsByIds } from "@/lib/ai/update-facts";
 import { slideFillSchemaForLayout } from "@/lib/ai/slide-content-schema";
 import { logAiActivity } from "@/lib/ai/activity";
 import { inferConfidenceFromCitations } from "@/lib/ai/confidence";
@@ -103,6 +107,17 @@ export async function fillDeckSlides(deckId: string, userId: string) {
 
   let totalTokens = 0;
 
+  const allFacts = extractUpdateFacts(projectUpdates);
+  const plan = await buildSlideContentPlan({
+    outline,
+    facts: allFacts,
+    contentAnalysis,
+    deckType: deck.type as DeckType,
+    aiTone,
+    audience,
+  });
+  const usePlan = plan !== null;
+
   try {
     const slides: Array<{
       order: number;
@@ -119,6 +134,18 @@ export async function fillDeckSlides(deckId: string, userId: string) {
         outlineSlide.title,
         outlineSlide.summary ?? ""
       );
+
+      const planEntry = plan?.entries.find((entry) => entry.slideIndex === index);
+      const scopedFacts =
+        usePlan && planEntry
+          ? factsByIds(allFacts, planEntry.factIds)
+          : undefined;
+
+      const alreadyCovered = slides.map((slide) => ({
+        title: slide.title,
+        summary: summarizeSlideContent(slide.content),
+      }));
+
       const prompt = buildSlideFillPrompt({
         deckType: deck.type as DeckType,
         projectName: project?.name ?? "Project",
@@ -136,6 +163,8 @@ export async function fillDeckSlides(deckId: string, userId: string) {
         includedSections: contentFocus.includedSections,
         deckBrief: contentFocus.deckBrief,
         contentAnalysis,
+        scopedFacts,
+        alreadyCovered: usePlan ? alreadyCovered : undefined,
       });
 
       const { object, usage } = await generateObject({
@@ -147,6 +176,16 @@ export async function fillDeckSlides(deckId: string, userId: string) {
       totalTokens += usage?.totalTokens ?? 0;
 
       const content = { ...object.content } as Record<string, unknown>;
+
+      const bullets = Array.isArray(content.bullets)
+        ? (content.bullets as string[])
+        : [];
+      if (speakerNotesRepeatBullets(bullets, object.speakerNotes ?? "")) {
+        console.warn(
+          `[slides.fill] repetitive speaker notes on slide ${index + 1}`
+        );
+      }
+
       if (outlineSlide.layout === "chart") {
         const chartData = resolveChartData({
           metrics: updates?.metrics,
