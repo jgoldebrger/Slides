@@ -49,6 +49,7 @@ export const AI_FEATURE_DESCRIPTIONS: Record<AiFeatureId, string> = {
   present_live_qa: "Handle live audience questions during presentation.",
   present_highlight_reel: "Build a short highlights reel from the deck.",
   present_pace_score: "Score pacing and rhythm of your delivery.",
+  present_ai_player: "Autonomous AI deck player with viewer Q&A on share links.",
   org_insight_library: "Reusable insight patterns extracted across projects.",
   org_portfolio_rollup: "Combine status from multiple projects into one view.",
   org_trend_over_time: "Track metrics and themes across update cycles.",

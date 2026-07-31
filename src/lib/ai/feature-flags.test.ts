@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isAiFeatureEnabled, enabledAiFeatures } from "@/lib/ai/feature-flags";
+import {
+  AI_FEATURE_IDS,
+  isAiFeatureEnabled,
+  enabledAiFeatures,
+} from "@/lib/ai/feature-flags";
 import { parseCitations } from "@/lib/ai/citations";
 import { inferConfidenceFromCitations } from "@/lib/ai/confidence";
 import { checkHitlForGeneratedContent } from "@/lib/ai/hitl";
@@ -17,6 +21,10 @@ describe("feature-flags", () => {
 
   it("lists enabled features", () => {
     expect(enabledAiFeatures().length).toBeGreaterThan(10);
+  });
+
+  it("includes present_ai_player feature id", () => {
+    expect(AI_FEATURE_IDS).toContain("present_ai_player");
   });
 });
 

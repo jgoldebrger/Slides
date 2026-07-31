@@ -3,6 +3,7 @@ export type RateLimitAction =
   | "generate"
   | "export"
   | "narrate"
+  | "player"
   | "auth_login"
   | "auth_signup"
   | "auth_reset";
@@ -12,6 +13,7 @@ const DEFAULT_LIMITS: Record<RateLimitAction, number> = {
   generate: 20,
   export: 30,
   narrate: 120,
+  player: 60,
   auth_login: 20,
   auth_signup: 10,
   auth_reset: 5,

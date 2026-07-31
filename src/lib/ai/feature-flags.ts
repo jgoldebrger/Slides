@@ -38,6 +38,7 @@ export const AI_FEATURE_IDS = [
   "present_live_qa",
   "present_highlight_reel",
   "present_pace_score",
+  "present_ai_player",
   "org_insight_library",
   "org_portfolio_rollup",
   "org_trend_over_time",
