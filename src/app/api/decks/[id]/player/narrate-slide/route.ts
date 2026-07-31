@@ -1,0 +1,101 @@
+import { createHash } from "crypto";
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { generatePlayerSlideScript } from "@/lib/ai/present/player-narration";
+import { getOrCreateNarrationMp3 } from "@/lib/ai/tts";
+import { AI_TTS_VOICES, normalizeAiTtsVoice } from "@/lib/ai/tts-voices";
+import { apiError, handleApiError } from "@/lib/api/response";
+import { assertOrgCanUsePaidFeatures } from "@/lib/billing/entitlements";
+import { PublicError } from "@/lib/errors/public-error";
+import { assertRateLimit } from "@/lib/rate-limit";
+import { authorizeDeckAccess } from "@/lib/share/authorize-deck-access";
+import { mapDbSlide } from "@/lib/slides/map-db-slide";
+import { createAdminClient } from "@/lib/supabase/admin";
+
+const bodySchema = z.object({
+  slideId: z.string().uuid(),
+  slideIndex: z.number().int().min(0),
+  slideCount: z.number().int().min(1),
+  voice: z.enum(AI_TTS_VOICES).optional(),
+  speed: z.number().min(0.25).max(4).optional(),
+  shareToken: z.string().min(16).max(200).optional(),
+});
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: deckId } = await params;
+    const parsed = bodySchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) return apiError("Invalid player narrate request", 400);
+
+    const { slideId, slideIndex, slideCount, shareToken } = parsed.data;
+    const voice = normalizeAiTtsVoice(parsed.data.voice);
+    const speed = parsed.data.speed ?? 1;
+
+    let orgId: string;
+    try {
+      ({ orgId } = await authorizeDeckAccess(deckId, shareToken));
+    } catch (err) {
+      const status =
+        err instanceof Error && "status" in err
+          ? Number((err as { status: number }).status)
+          : 403;
+      return apiError(err instanceof Error ? err.message : "Forbidden", status);
+    }
+
+    const admin = createAdminClient();
+    try {
+      await assertOrgCanUsePaidFeatures(admin, orgId);
+      await assertRateLimit(orgId, "player");
+    } catch (err) {
+      if (err instanceof PublicError) {
+        return apiError(err.message, 402, "payment_required");
+      }
+      throw err;
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return apiError("AI voice is not configured", 503, "tts_unavailable");
+    }
+
+    const [{ data: deck }, { data: slide, error: slideError }] = await Promise.all([
+      admin.from("decks").select("name").eq("id", deckId).single(),
+      admin.from("slides").select("*").eq("id", slideId).eq("deck_id", deckId).maybeSingle(),
+    ]);
+
+    if (slideError || !slide) return apiError("Slide not found", 404);
+    const mapped = mapDbSlide(slide);
+    const script = await generatePlayerSlideScript({
+      slide: mapped,
+      slideIndex,
+      slideCount,
+      deckName: deck?.name ?? "Presentation",
+    });
+
+    if (!script.trim()) return apiError("Slide has no readable content", 400);
+
+    const mp3 = await getOrCreateNarrationMp3({
+      supabase: admin,
+      orgId,
+      deckId,
+      text: script,
+      voice,
+      speed,
+    });
+
+    const etag = createHash("sha256").update(mp3).digest("hex").slice(0, 24);
+    return new NextResponse(new Uint8Array(mp3), {
+      status: 200,
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Cache-Control": "private, max-age=86400",
+        ETag: `"${etag}"`,
+        "X-Player-Script-Sha": createHash("sha256").update(script).digest("hex").slice(0, 16),
+      },
+    });
+  } catch (err) {
+    return handleApiError(err);
+  }
+}
