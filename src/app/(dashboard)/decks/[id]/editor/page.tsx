@@ -4,7 +4,13 @@ import { DeckExportBanner } from "@/components/decks/deck-export-banner";
 import { DeckGeneratingBanner } from "@/components/decks/deck-generating-banner";
 import { ApplyBrandingToggle } from "@/components/decks/apply-branding-toggle";
 import { DeckStatusBadge } from "@/components/decks/deck-status-badge";
+import {
+  DeferredQuestionsPanel,
+  type DeferredQuestion,
+} from "@/components/decks/deferred-questions-panel";
 import { SlideEditor } from "@/components/decks/slide-editor";
+import { isAiFeatureEnabled } from "@/lib/ai/feature-flags";
+import { loadOrgAiPrefs } from "@/lib/ai/org-prefs";
 import { loadDeckBrandPreview } from "@/lib/brand/load-deck-brand";
 import { deckPageTitle } from "@/lib/page-title";
 import { mapDbSlide } from "@/lib/slides/map-db-slide";
@@ -72,6 +78,24 @@ export default async function DeckEditorPage({
     deck.org_id,
     deck.apply_branding ?? true
   );
+  const aiPrefs = await loadOrgAiPrefs(supabase, deck.org_id);
+  const deferredQuestionsEnabled = isAiFeatureEnabled(
+    "present_ai_player",
+    aiPrefs.featureOverrides ?? null
+  );
+  const deferredQuestions = deferredQuestionsEnabled
+    ? (
+        await supabase
+          .from("deferred_questions")
+          .select(
+            "id, question, viewer_email, status, owner_answer, answered_at, created_at"
+          )
+          .eq("deck_id", id)
+          .eq("status", "pending")
+          .order("created_at", { ascending: false })
+          .limit(100)
+      ).data ?? []
+    : [];
 
   const deckBackgroundUrl = deck.background_image_path
     ? await getSignedStorageUrl(supabase, "slide-assets", deck.background_image_path)
@@ -127,6 +151,13 @@ export default async function DeckEditorPage({
         exportId={latestExport?.id ?? null}
         initialStatus={latestExport?.status ?? null}
       />
+
+      {deferredQuestionsEnabled ? (
+        <DeferredQuestionsPanel
+          deckId={id}
+          initialQuestions={deferredQuestions as DeferredQuestion[]}
+        />
+      ) : null}
 
       {mappedSlides.length > 0 ? (
         <ApplyBrandingToggle
