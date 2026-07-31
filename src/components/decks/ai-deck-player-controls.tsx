@@ -1,9 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Pause, Play } from "lucide-react";
+import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, MessageCircle, Pause, Play, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   transitionPlayerPhase,
   type PlayerPhase,
@@ -11,6 +13,14 @@ import {
 import type { AiTtsVoice } from "@/lib/ai/tts-voices";
 
 type SlideRef = { id: string };
+
+type PlayerQaResult =
+  | {
+      type: "answered";
+      spokenReply: string;
+      citations: Array<{ field: string; excerpt: string }>;
+    }
+  | { type: "deferred"; spokenReply: string };
 
 type AiDeckPlayerControlsProps = {
   deckId: string;
@@ -35,7 +45,13 @@ export function AiDeckPlayerControls({
 }: AiDeckPlayerControlsProps) {
   const [phase, setPhase] = useState<PlayerPhase>("idle");
   const [loading, setLoading] = useState(false);
+  const [question, setQuestion] = useState("");
+  const [viewerEmail, setViewerEmail] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [qaResult, setQaResult] = useState<PlayerQaResult | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const answerAudioRef = useRef<HTMLAudioElement | null>(null);
+  const answerAudioUrlRef = useRef<string | null>(null);
   const audioUrlRef = useRef<string | null>(null);
   const activeIndexRef = useRef<number | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -159,6 +175,15 @@ export function AiDeckPlayerControls({
 
   useEffect(() => clearAudio, [clearAudio]);
 
+  useEffect(() => {
+    return () => {
+      answerAudioRef.current?.pause();
+      if (answerAudioUrlRef.current) {
+        URL.revokeObjectURL(answerAudioUrlRef.current);
+      }
+    };
+  }, []);
+
   function handlePlay() {
     if (phase === "complete") {
       clearAudio();
@@ -182,6 +207,111 @@ export function AiDeckPlayerControls({
     setPhase((current) =>
       transitionPlayerPhase(current, { type: "RESUME" })
     );
+  }
+
+  async function handleQuestionSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const trimmedQuestion = question.trim();
+    if (!trimmedQuestion || asking) return;
+
+    audioRef.current?.pause();
+    abortRef.current?.abort();
+    setLoading(false);
+    setAsking(true);
+    setQaResult(null);
+    setPhase((current) =>
+      transitionPlayerPhase(current, { type: "QUESTION_ASKED" })
+    );
+
+    try {
+      const askResponse = await fetch(
+        `/api/decks/${encodeURIComponent(deckId)}/player/ask`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: trimmedQuestion,
+            shareToken,
+            ...(viewerEmail.trim()
+              ? { viewerEmail: viewerEmail.trim() }
+              : {}),
+          }),
+        }
+      );
+
+      if (!askResponse.ok) {
+        let message = "The AI presenter could not answer right now.";
+        try {
+          const body = (await askResponse.json()) as {
+            error?: { message?: string };
+          };
+          if (body.error?.message) message = body.error.message;
+        } catch {
+          // Keep the generic message for non-JSON errors.
+        }
+        throw new Error(message);
+      }
+
+      const result = (await askResponse.json()) as PlayerQaResult;
+      if (
+        (result.type !== "answered" && result.type !== "deferred") ||
+        typeof result.spokenReply !== "string" ||
+        (result.type === "answered" && !Array.isArray(result.citations))
+      ) {
+        throw new Error("The AI presenter returned an invalid answer.");
+      }
+      setQaResult(result);
+      setQuestion("");
+
+      const speakResponse = await fetch(
+        `/api/decks/${encodeURIComponent(deckId)}/player/speak`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: result.spokenReply,
+            voice,
+            speed,
+            shareToken,
+          }),
+        }
+      );
+      if (!speakResponse.ok) {
+        throw new Error("The answer is ready, but its audio could not be played.");
+      }
+
+      const answerBlob = await speakResponse.blob();
+      if (!answerBlob.type.includes("audio") || answerBlob.size < 64) {
+        throw new Error("The answer audio was invalid.");
+      }
+
+      answerAudioRef.current?.pause();
+      if (answerAudioUrlRef.current) {
+        URL.revokeObjectURL(answerAudioUrlRef.current);
+      }
+      const answerUrl = URL.createObjectURL(answerBlob);
+      answerAudioUrlRef.current = answerUrl;
+      const answerAudio = new Audio(answerUrl);
+      answerAudioRef.current = answerAudio;
+      await new Promise<void>((resolve, reject) => {
+        answerAudio.onended = () => resolve();
+        answerAudio.onerror = () => reject(new Error("Could not play answer audio."));
+        void answerAudio.play().catch(reject);
+      });
+      URL.revokeObjectURL(answerUrl);
+      answerAudioUrlRef.current = null;
+    } catch (error) {
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "The AI presenter could not answer right now."
+      );
+    } finally {
+      setAsking(false);
+      setPhase((current) =>
+        transitionPlayerPhase(current, { type: "ANSWER_DONE" })
+      );
+    }
   }
 
   if (!enabled || slides.length === 0) return null;
@@ -226,6 +356,93 @@ export function AiDeckPlayerControls({
           </Button>
         )}
       </div>
+
+      <div className="my-4 h-px bg-border" aria-hidden />
+
+      <form className="space-y-3" onSubmit={handleQuestionSubmit}>
+        <div>
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <MessageCircle className="h-4 w-4 text-link" />
+            Ask about this presentation
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Answers use only the slides and linked project update.
+          </p>
+        </div>
+        <Textarea
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          placeholder="What would you like to know?"
+          maxLength={500}
+          disabled={asking || phase === "idle" || phase === "complete"}
+          aria-label="Question for the AI presenter"
+          required
+        />
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            type="email"
+            value={viewerEmail}
+            onChange={(event) => setViewerEmail(event.target.value)}
+            placeholder="Email for follow-up (optional)"
+            maxLength={320}
+            disabled={asking || phase === "idle" || phase === "complete"}
+            aria-label="Email for question follow-up"
+          />
+          <Button
+            type="submit"
+            size="sm"
+            disabled={
+              asking ||
+              !question.trim() ||
+              phase === "idle" ||
+              phase === "complete"
+            }
+          >
+            {asking ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="mr-1 h-4 w-4" />
+            )}
+            {asking ? "Answering…" : "Ask"}
+          </Button>
+        </div>
+        {phase === "idle" || phase === "complete" ? (
+          <p className="text-xs text-muted-foreground">
+            Start the AI presenter to ask a question.
+          </p>
+        ) : null}
+      </form>
+
+      {qaResult ? (
+        <div
+          className={
+            qaResult.type === "deferred"
+              ? "mt-4 rounded-md border border-warning/30 bg-warning/10 p-3 text-sm"
+              : "mt-4 rounded-md border border-link/20 bg-background p-3 text-sm"
+          }
+          aria-live="polite"
+        >
+          <p className="font-medium">
+            {qaResult.type === "deferred" ? "Question deferred" : "AI answer"}
+          </p>
+          <p className="mt-1 text-muted-foreground">{qaResult.spokenReply}</p>
+          {qaResult.type === "answered" && qaResult.citations.length > 0 ? (
+            <div className="mt-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Sources
+              </p>
+              <ul className="mt-1 space-y-1">
+                {qaResult.citations.map((citation, index) => (
+                  <li key={`${citation.field}-${index}`} className="text-xs">
+                    <span className="font-medium">{citation.field}:</span>{" "}
+                    {citation.excerpt}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </section>
   );
 }
